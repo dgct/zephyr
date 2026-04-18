@@ -144,13 +144,13 @@ static void ls0xx_vcom_toggle(void *a, void *b, void *c)
 			uint8_t empty_cmd[2] = {0, 0};
 			/* Send empty command to toggle VCOM */
 			ls0xx_cmd(dev, empty_cmd, sizeof(empty_cmd));
+			/* Sleep before giving semaphore based on errors in testing */
+			k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
+			k_sem_give(&ls0xx_bus_sem);
+			spi_release_dt(&config->bus);
 		} else {
 			LOG_ERR("memory display semaphore not available - cmd");
 		}
-		/* Sleep before giving semaphore based on errors in testing */
-		k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
-	    k_sem_give(&ls0xx_bus_sem);
-		spi_release_dt(&config->bus);
 		k_msleep(config->serial_vcom_int);
 #endif /* DT_INST_NODE_HAS_PROP(0, extcomin_gpios) */
 	}
@@ -168,13 +168,13 @@ static int ls0xx_clear(const struct device *dev)
 
 	if (k_sem_take(&ls0xx_bus_sem, K_MSEC(LS0XX_MAX_BUS_WAIT_MSEC)) == 0) {
 		err = ls0xx_cmd(dev, clear_cmd, sizeof(clear_cmd));
+		k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
+		k_sem_give(&ls0xx_bus_sem);
+		spi_release_dt(&config->bus);
 	} else {
 		LOG_ERR("memory display semaphore not available - data");
 		err = -EBUSY;
 	}
-	k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
-	k_sem_give(&ls0xx_bus_sem);
-	spi_release_dt(&config->bus);
 
 	return err;
 }
@@ -225,13 +225,13 @@ static int ls0xx_update_display(const struct device *dev,
 		 * just reusing the write_cmd buffer
 		 */
 		err |= ls0xx_cmd(dev, write_cmd, sizeof(write_cmd));
+		k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
+		k_sem_give(&ls0xx_bus_sem);
+		spi_release_dt(&config->bus);
 	} else {
 		LOG_ERR("memory display semaphore not available - refresh data");
 		err = -EBUSY;
 	}
-	k_sleep(K_TICKS(LS0XX_BUS_RETURN_DELAY_TICKS));
-	k_sem_give(&ls0xx_bus_sem);
-	spi_release_dt(&config->bus);
 
 	return err;
 }
