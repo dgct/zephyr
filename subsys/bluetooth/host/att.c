@@ -389,6 +389,44 @@ static void att_disconnect(struct bt_att_chan *chan)
 	}
 }
 
+static void att_sent(void *user_data)
+{
+	struct bt_att_tx_meta_data *data = user_data;
+	struct bt_att_chan *att_chan = data->att_chan;
+	struct bt_conn *conn = att_chan->att->conn;
+	struct bt_l2cap_chan *chan = &att_chan->chan.chan;
+
+	__ASSERT_NO_MSG(!bt_att_is_enhanced(att_chan));
+
+	LOG_DBG("conn %p chan %p", conn, chan);
+
+	/* For EATT, `bt_att_sent` is assigned to the `.sent` L2 callback.
+	 * L2CAP will then call it once the SDU has finished sending.
+	 *
+	 * For UATT, this won't happen, as static LE l2cap channels don't have
+	 * SDUs. Call it manually instead.
+	 */
+	bt_att_sent(chan);
+}
+
+#if defined(CONFIG_BT_ATT_SENT_CB_AFTER_TX)
+/* Backport from NCS: when ATT_SENT_CB_AFTER_TX is enabled, chan_send takes
+ * an extra ref on the PDU and passes this callback to bt_l2cap_send_pdu. The
+ * controller-acked TX-complete path (Number-Of-Completed-Packets handler in
+ * conn.c) eventually invokes this CB which releases the extra ref. The buf
+ * itself outlives the synchronous return from chan_send by exactly the air-
+ * time + ack of one PDU, giving callers true radio-paced backpressure.
+ */
+static void chan_sent_cb(struct bt_conn *conn, void *user_data, int err)
+{
+	struct net_buf *nb = user_data;
+
+	ARG_UNUSED(conn);
+	ARG_UNUSED(err);
+
+	net_buf_unref(nb);
+}
+#endif /* CONFIG_BT_ATT_SENT_CB_AFTER_TX */
 /* In case of success the ownership of the buffer is transferred to the stack
  * which takes care of releasing it when it completes transmitting to the
  * controller.
@@ -498,7 +536,19 @@ static int chan_send(struct bt_att_chan *chan, struct net_buf *buf)
 
 	data->att_chan = chan;
 
+#if defined(CONFIG_BT_ATT_SENT_CB_AFTER_TX)
+	/* Take an extra ref so the buf outlives the synchronous TX path.
+	 * chan_sent_cb() releases the ref from the controller TX-complete
+	 * context. bt_l2cap_send_pdu() and bt_conn send_buf() have relaxed
+	 * refcount assertions to allow ref==2 in this configuration.
+	 */
+	err = bt_l2cap_send_pdu(&chan->chan, buf, chan_sent_cb, net_buf_ref(buf));
+	if (err) {
+		net_buf_unref(buf);
+	}
+#else
 	err = bt_l2cap_send_pdu(&chan->chan, buf, NULL, NULL);
+#endif
 	if (err) {
 		if (err == -ENOBUFS) {
 			LOG_ERR("Ran out of TX buffers or contexts.");

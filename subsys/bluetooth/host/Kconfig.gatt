@@ -22,6 +22,27 @@ config BT_ATT_TX_COUNT
 	  These buffers are only used for sending anything over ATT.
 	  Requests, responses, indications, confirmations, notifications.
 
+config BT_ATT_SENT_CB_AFTER_TX
+	bool "Delay ATT 'sent' callback until controller confirms TX [EXPERIMENTAL]"
+	select EXPERIMENTAL
+	help
+	  By default the bt_gatt_notify_cb() completion callback fires when
+	  the host pushes the PDU to HCI (microseconds after submit), not
+	  when the controller has actually transmitted the PDU over the air.
+	  Enabling this defers the ATT 'sent' callback until the controller
+	  reports Number-Of-Completed-Packets for the PDU, providing true
+	  radio-paced backpressure for callers that gate further sends on
+	  the completion callback.
+
+	  This is a backport of the same-named symbol from nrfconnect/sdk-zephyr
+	  (NCS), where it is used by nRF Desktop to pace HID-over-GATT reports.
+
+	  Implementation note: enabling this causes the ATT layer to take an
+	  extra net_buf reference on each TX PDU; the reference is released
+	  in chan_sent_cb() once the controller reports TX complete. Refcount
+	  assertions in bt_l2cap_send_pdu() and bt_conn send_buf() are relaxed
+	  accordingly.
+
 config BT_ATT_PREPARE_COUNT
 	int "Number of ATT prepare write buffers"
 	default 0

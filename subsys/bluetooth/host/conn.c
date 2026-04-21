@@ -709,12 +709,17 @@ static int send_buf(struct bt_conn *conn, struct net_buf *buf,
 
 	uint16_t frag_len = MIN(conn_mtu(conn), len);
 
-	/* Check that buf->ref is 1 or 2. It would be 1 if this
-	 * was the only reference (e.g. buf was removed
-	 * from the conn tx_queue). It would be 2 if the
-	 * tx_data_pull kept it on the tx_queue for segmentation.
+	/* If ATT_SENT_CB_AFTER_TX is enabled, the ATT layer takes an extra ref
+	 * on the buf in chan_send() so it can release it from the controller
+	 * TX-complete callback (chan_sent_cb). At this point in the path the
+	 * extra ref is still held, so ref==2 is expected. Without that feature
+	 * only the inbound ref exists, so ref==1 is expected.
 	 */
-	__ASSERT_NO_MSG((buf->ref == 1) || (buf->ref == 2));
+#if defined(CONFIG_BT_ATT_SENT_CB_AFTER_TX)
+	__ASSERT_NO_MSG(buf->ref == 1 || buf->ref == 2);
+#else
+	__ASSERT_NO_MSG(buf->ref == 1);
+#endif
 
 	/* The reference is always transferred to the frag, so when
 	 * the frag is destroyed, the parent reference is decremented.
