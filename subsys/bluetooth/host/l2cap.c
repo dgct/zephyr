@@ -777,13 +777,25 @@ int bt_l2cap_send_pdu(struct bt_l2cap_le_chan *le_chan, struct net_buf *pdu,
 		return -ENOTCONN;
 	}
 
-	if (pdu->ref != 1) {
+	/* If ATT_SENT_CB_AFTER_TX is enabled, att.c chan_send() takes an extra
+	 * ref before calling here so the buf survives until the controller
+	 * acks TX. In that case the expected ref count is 2 (one for the
+	 * caller-held ref scheduled to be unref'd by chan_sent_cb, and one
+	 * about to be transferred to the L2CAP TX queue).
+	 */
+	uint8_t expected_ref = 1;
+#if defined(CONFIG_BT_ATT_SENT_CB_AFTER_TX)
+	if (cb != NULL) {
+		expected_ref = 2;
+	}
+#endif
+	if (pdu->ref != expected_ref) {
 		/* The host may alter the buf contents when fragmenting. Higher
 		 * layers cannot expect the buf contents to stay intact. Extra
 		 * refs suggests a silent data corruption would occur if not for
 		 * this error.
 		 */
-		LOG_ERR("Expecting 1 ref, got %d", pdu->ref);
+		LOG_ERR("Expecting %u ref, got %d", expected_ref, pdu->ref);
 		return -EINVAL;
 	}
 
