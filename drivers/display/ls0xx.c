@@ -84,7 +84,7 @@ static int ls0xx_blanking_off(const struct device *dev)
 
 	return gpio_pin_set_dt(&config->disp_en_gpio, 1);
 #else
-	LOG_WRN("Unsupported");
+	LOG_DBG("Unsupported");
 	return -ENOTSUP;
 #endif
 }
@@ -96,7 +96,7 @@ static int ls0xx_blanking_on(const struct device *dev)
 
 	return gpio_pin_set_dt(&config->disp_en_gpio, 0);
 #else
-	LOG_WRN("Unsupported");
+	LOG_DBG("Unsupported");
 	return -ENOTSUP;
 #endif
 }
