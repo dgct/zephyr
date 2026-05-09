@@ -389,6 +389,9 @@ static void att_disconnect(struct bt_att_chan *chan)
 	}
 }
 
+/* Forward declaration: used below, defined further down */
+static void bt_att_sent(struct bt_l2cap_chan *ch);
+
 static void att_sent(void *user_data)
 {
 	struct bt_att_tx_meta_data *data = user_data;
