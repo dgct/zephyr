@@ -17,6 +17,8 @@ zephyr_library_sources(
 # headers for different SoCs.
 set(dt_binding_includes ${DTS_INCLUDE_FILES})
 list(FILTER dt_binding_includes INCLUDE REGEX "/dt-bindings/.*\.h$")
+# Exclude non-Zephyr dt-bindings that may conflict with nrfx.h
+list(FILTER dt_binding_includes EXCLUDE REGEX "/dt-bindings/zmk/")
 
 set(include_flag $<TARGET_PROPERTY:compiler,include_file>$<SEMICOLON>)
 
