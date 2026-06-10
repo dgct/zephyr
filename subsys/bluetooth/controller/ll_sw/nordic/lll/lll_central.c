@@ -149,6 +149,12 @@ static int prepare_cb(struct lll_prepare_param *p)
 					       lll->data_chan_count);
 	}
 
+#if defined(CONFIG_BT_CTLR_QOS_CRC_HOOK)
+	/* Stash the channel used for this event so the RX ISR can report it
+	 * to the QoS module together with CRC status. */
+	lll->qos_data_chan = data_chan_use;
+#endif /* CONFIG_BT_CTLR_QOS_CRC_HOOK */
+
 	/* Prepare the Tx PDU */
 	lll_conn_pdu_tx_prep(lll, &pdu_data_tx);
 	pdu_data_tx->sn = lll->sn;
