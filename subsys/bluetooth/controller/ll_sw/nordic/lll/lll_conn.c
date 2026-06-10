@@ -43,6 +43,18 @@
 
 #include "hal/debug.h"
 
+#if defined(CONFIG_BT_CTLR_QOS_CRC_HOOK)
+/* Weak no-op default so the controller links standalone when no QoS
+ * consumer is present. An application module provides the strong
+ * definition to receive per-event CRC reports. */
+__weak void zmk_qos_crc_report(uint16_t handle, uint8_t chan, bool crc_ok)
+{
+	ARG_UNUSED(handle);
+	ARG_UNUSED(chan);
+	ARG_UNUSED(crc_ok);
+}
+#endif /* CONFIG_BT_CTLR_QOS_CRC_HOOK */
+
 static int init_reset(void);
 static void isr_done(void *param);
 static uint16_t max_rx_octets_get(struct lll_conn *lll);
@@ -408,6 +420,15 @@ void lll_conn_isr_rx(void *param)
 		crc_expire--;
 		is_done = (crc_expire == 0U);
 	}
+
+#if defined(CONFIG_BT_CTLR_QOS_CRC_HOOK)
+	/* Report per-event CRC outcome for central-role links so an
+	 * application QoS module can score and prune bad data channels.
+	 * Kept tiny: it runs in the radio RX ISR. */
+	if (lll->role == BT_HCI_ROLE_CENTRAL) {
+		zmk_qos_crc_report(lll->handle, lll->qos_data_chan, crc_ok);
+	}
+#endif /* CONFIG_BT_CTLR_QOS_CRC_HOOK */
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RX) && defined(CONFIG_BT_CTLR_LE_ENC)
 		if (lll->enc_rx) {

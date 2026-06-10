@@ -1202,6 +1202,18 @@ config BT_CTLR_EVENT_IFS_LOW_LAT_US
 	help
 	  Set low latency tIFS value.
 
+config BT_CTLR_QOS_CRC_HOOK
+	bool "Per-connection-event CRC reporting hook for QoS"
+	depends on BT_CENTRAL
+	help
+	  Emit a per-connection-event callback (zmk_qos_crc_report) from the
+	  connection RX ISR for central-role connections, carrying the data
+	  channel index used for the event and whether the received PDU's CRC
+	  was valid. Consumed by an application-level QoS module to rate BLE
+	  data channels and prune bad ones via HCI LE Set Host Channel
+	  Classification. The controller provides a __weak no-op default, so
+	  it builds standalone when no consumer is linked.
+
 endif # BT_CONN
 
 config BT_CTLR_ADV_INDICATION

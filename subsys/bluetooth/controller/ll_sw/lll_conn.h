@@ -87,6 +87,14 @@ struct lll_conn {
 		uint16_t data_chan_id;
 	};
 
+#if defined(CONFIG_BT_CTLR_QOS_CRC_HOOK)
+	/* Data channel index used for the current connection event, stashed
+	 * in prepare_cb so the RX ISR can report it alongside CRC status.
+	 * Needed because data_chan_use is unioned with data_chan_id and is
+	 * not a valid current-channel store under CSA#2. */
+	uint8_t qos_data_chan;
+#endif /* CONFIG_BT_CTLR_QOS_CRC_HOOK */
+
 	union {
 		struct {
 			uint8_t initiated:1;
