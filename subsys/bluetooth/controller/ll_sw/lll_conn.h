@@ -158,6 +158,21 @@ struct lll_conn {
 		uint8_t update;
 	} fsu;
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	/* Connection Subrating negotiated state (BT 5.x Vol 6, Part B,
+	 * Sect 4.5.1 / 5.1.19). The connection interval is unchanged; the
+	 * subrate factor, base event and continuation number define the
+	 * subrated listening cadence. The subrate peripheral latency is kept
+	 * in lll->latency (in connection-event units here; subrate-event
+	 * anchored skipping is a radio-scheduler/bsim concern).
+	 */
+	struct {
+		uint16_t factor;
+		uint16_t base_event;
+		uint16_t continuation_number;
+	} subrate;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_PHY)
 	uint8_t phy_tx:3;
 	uint8_t phy_flags:1;

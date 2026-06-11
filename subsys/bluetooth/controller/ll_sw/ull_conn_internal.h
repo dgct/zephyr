@@ -92,6 +92,12 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc,
 				uint16_t interval, uint16_t latency,
 				uint16_t timeout, uint16_t instant);
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+void ull_conn_subrate_apply(struct ll_conn *conn, uint16_t subrate_factor,
+			    uint16_t subrate_base_event, uint16_t peripheral_latency,
+			    uint16_t continuation_number, uint16_t supervision_timeout);
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 void ull_conn_update_peer_sca(struct ll_conn *conn);
 
 void ull_conn_default_tx_octets_set(uint16_t tx_octets);

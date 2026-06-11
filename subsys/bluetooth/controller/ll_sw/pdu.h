@@ -630,6 +630,8 @@ enum pdu_data_llctrl_type {
 	PDU_DATA_LLCTRL_TYPE_CIS_RSP = 0x20,
 	PDU_DATA_LLCTRL_TYPE_CIS_IND = 0x21,
 	PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND = 0x22,
+	PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ = 0x26,
+	PDU_DATA_LLCTRL_TYPE_SUBRATE_IND = 0x27,
 	PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ = 0x2B,
 	PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP = 0x2C,
 	PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ = 0x3B,
@@ -830,6 +832,22 @@ struct pdu_data_llctrl_fsu_rsp {
 	uint16_t spacing_type;
 } __packed;
 
+struct pdu_data_llctrl_subrate_req {
+	uint16_t subrate_factor_min;
+	uint16_t subrate_factor_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+} __packed;
+
+struct pdu_data_llctrl_subrate_ind {
+	uint16_t subrate_factor;
+	uint16_t subrate_base_event;
+	uint16_t latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+} __packed;
+
 struct pdu_data_llctrl_phy_req {
 	uint8_t tx_phys;
 	uint8_t rx_phys;
@@ -982,6 +1000,8 @@ struct pdu_data_llctrl {
 		struct pdu_data_llctrl_length_rsp length_rsp;
 		struct pdu_data_llctrl_fsu_req fsu_req;
 		struct pdu_data_llctrl_fsu_rsp fsu_rsp;
+		struct pdu_data_llctrl_subrate_req subrate_req;
+		struct pdu_data_llctrl_subrate_ind subrate_ind;
 		struct pdu_data_llctrl_phy_req phy_req;
 		struct pdu_data_llctrl_phy_rsp phy_rsp;
 		struct pdu_data_llctrl_phy_upd_ind phy_upd_ind;

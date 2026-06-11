@@ -32,6 +32,7 @@ enum llcp_proc {
 	PROC_SCA_UPDATE,
 	PROC_PERIODIC_SYNC,
 	PROC_FRAME_SPACE,
+	PROC_SUBRATE,
 	/* A helper enum entry, to use in pause procedure context */
 	PROC_NONE = 0x0,
 };
@@ -253,6 +254,19 @@ struct proc_ctx {
 			uint16_t offsets[6];
 #endif /* defined(CONFIG_BT_CTLR_CONN_PARAM_REQ) */
 		} cu;
+
+		/* Connection Subrate Update & Connection Subrate Request */
+		struct {
+			uint8_t error;
+			uint16_t subrate_factor_min;
+			uint16_t subrate_factor_max;
+			uint16_t subrate_factor;
+			uint16_t subrate_base_event;
+			uint16_t max_latency;
+			uint16_t latency;
+			uint16_t continuation_number;
+			uint16_t timeout;
+		} subrate;
 
 		/* Use by ACL Termination Procedure */
 		struct {
@@ -563,6 +577,20 @@ bool llcp_rp_conn_param_req_apm_awaiting_reply(struct proc_ctx *ctx);
 void llcp_rp_conn_param_req_apm_reply(struct ll_conn *conn, struct proc_ctx *ctx);
 bool llcp_rp_cu_awaiting_instant(struct proc_ctx *ctx);
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+/*
+ * LLCP Local Procedure Connection Subrate Update
+ */
+void llcp_lp_sr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_lp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+
+/*
+ * LLCP Remote Procedure Connection Subrate Update
+ */
+void llcp_rp_sr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_rp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 /*
  * Terminate Helper
  */
@@ -771,6 +799,15 @@ void llcp_pdu_encode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_decode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_decode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu);
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+/*
+ * Connection Subrate Update Procedure Helper
+ */
+void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_ntf_encode_subrate_change(struct proc_ctx *ctx, struct pdu_data *pdu);
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
 /*

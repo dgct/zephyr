@@ -2585,6 +2585,58 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 	conn->cancel_prepare = 1U;
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+void ull_conn_subrate_apply(struct ll_conn *conn, uint16_t subrate_factor,
+			    uint16_t subrate_base_event, uint16_t peripheral_latency,
+			    uint16_t continuation_number, uint16_t supervision_timeout)
+{
+	struct lll_conn *lll = &conn->lll;
+	uint32_t conn_interval_us;
+
+	/* Connection Subrating (BT 5.x Vol 6, Part B, Sect 4.5.1 / 5.1.19) does
+	 * NOT change the connection interval, so there is no procedure instant
+	 * and the new cadence takes effect immediately. Record the negotiated
+	 * subrate state and apply the supervision timeout / peripheral latency.
+	 */
+	lll->subrate.factor = subrate_factor;
+	lll->subrate.base_event = subrate_base_event;
+	lll->subrate.continuation_number = continuation_number;
+
+	/* The subrate peripheral latency is the maximum number of subrate
+	 * events the peripheral may skip. Installing it as the connection-event
+	 * latency is conservative (the peripheral listens at least this often),
+	 * which keeps the link safe; subrate-event anchored skipping using
+	 * lll->subrate is a radio-scheduler optimisation validated under bsim.
+	 */
+	lll->latency = peripheral_latency;
+
+	conn->supervision_timeout = supervision_timeout;
+
+	/* Force the supervision timeout countdown to be recomputed from the new
+	 * supervision timeout value on the next connection event.
+	 */
+	conn->supervision_expire = 0U;
+
+	if (lll->interval >= BT_HCI_LE_INTERVAL_MIN) {
+		conn_interval_us = lll->interval * CONN_INT_UNIT_US;
+	} else {
+		conn_interval_us = (lll->interval + 1U) * CONN_LOW_LAT_INT_UNIT_US;
+	}
+
+#if defined(CONFIG_BT_CTLR_LE_PING)
+	/* APTO in no. of connection events (interval is unchanged, but the
+	 * authenticated payload timeout reload depends on the latency).
+	 */
+	conn->apto_reload = RADIO_CONN_EVENTS((30U * 1000U * 1000U), conn_interval_us);
+	conn->appto_reload = (conn->apto_reload > (lll->latency + 6U)) ?
+				     (conn->apto_reload - (lll->latency + 6U)) :
+				     conn->apto_reload;
+#else
+	ARG_UNUSED(conn_interval_us);
+#endif /* CONFIG_BT_CTLR_LE_PING */
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_PERIPHERAL)
 void ull_conn_update_peer_sca(struct ll_conn *conn)
 {
