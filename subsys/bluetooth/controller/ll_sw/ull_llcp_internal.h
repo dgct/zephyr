@@ -33,6 +33,7 @@ enum llcp_proc {
 	PROC_PERIODIC_SYNC,
 	PROC_FRAME_SPACE,
 	PROC_SUBRATE,
+	PROC_CONN_RATE,
 	/* A helper enum entry, to use in pause procedure context */
 	PROC_NONE = 0x0,
 };
@@ -267,6 +268,31 @@ struct proc_ctx {
 			uint16_t continuation_number;
 			uint16_t timeout;
 		} subrate;
+
+		/* Connection Rate Update & Connection Rate Request (Shorter
+		 * Connection Intervals; Core 6.2, Vol 6, Part B, 5.1.32 / 5.1.33)
+		 */
+		struct {
+			uint8_t error;
+			uint8_t rejected_opcode;
+			/* Requested ranges (LL_CONNECTION_RATE_REQ, 2.4.2.57) */
+			uint16_t interval_min;
+			uint16_t interval_max;
+			uint16_t subrate_factor_min;
+			uint16_t subrate_factor_max;
+			uint16_t max_latency;
+			uint16_t preferred_periodicity;
+			uint16_t reference_conn_event_count;
+			uint16_t offsets[4];
+			/* Selected values (LL_CONNECTION_RATE_IND, 2.4.2.58) */
+			uint32_t win_offset_us;
+			uint16_t interval;
+			uint16_t instant;
+			uint16_t subrate_factor;
+			uint16_t latency;
+			uint16_t continuation_number;
+			uint16_t timeout;
+		} conn_rate;
 
 		/* Use by ACL Termination Procedure */
 		struct {
@@ -598,6 +624,21 @@ void llcp_rp_sr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_t
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+/*
+ * LLCP Local Procedure Connection Rate Update / Request
+ * (Shorter Connection Intervals, Core 6.2, Vol 6, Part B, 5.1.32 / 5.1.33)
+ */
+void llcp_lp_cr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_lp_cr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+
+/*
+ * LLCP Remote Procedure Connection Rate Update / Request
+ */
+void llcp_rp_cr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
+void llcp_rp_cr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 /*
  * Terminate Helper
  */
@@ -832,6 +873,35 @@ struct llcp_subrate_defaults {
 const struct llcp_subrate_defaults *llcp_subrate_defaults_get(void);
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+/*
+ * Connection Rate Update / Request Procedure Helper
+ * (Shorter Connection Intervals, Core 6.2, Vol 6, Part B, 2.4.2.57 / 2.4.2.58)
+ */
+void llcp_pdu_encode_conn_rate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_conn_rate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_ntf_encode_conn_rate_change(struct proc_ctx *ctx, struct pdu_data *pdu);
+#if defined(CONFIG_BT_CENTRAL)
+void llcp_pdu_encode_conn_rate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_conn_rate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+
+/* Central-side acceptable Connection Rate parameters, used to negotiate a peer
+ * Peripheral's LL_CONNECTION_RATE_REQ (Core 6.2, Vol 6, Part B, 5.1.33).
+ */
+struct llcp_conn_rate_defaults {
+	uint16_t interval_min;
+	uint16_t interval_max;
+	uint16_t factor_min;
+	uint16_t factor_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+};
+
+const struct llcp_conn_rate_defaults *llcp_conn_rate_defaults_get(void);
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
 /*

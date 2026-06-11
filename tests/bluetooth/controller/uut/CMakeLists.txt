@@ -40,6 +40,12 @@ if(CONFIG_BT_CTLR_SUBRATING)
   )
 endif()
 
+if(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+  target_sources(uut PRIVATE
+    ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_conn_rate.c
+  )
+endif()
+
 if(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER OR CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER)
   target_sources(uut PRIVATE
     ${ZEPHYR_BASE}/subsys/bluetooth/controller/ll_sw/ull_llcp_past.c
