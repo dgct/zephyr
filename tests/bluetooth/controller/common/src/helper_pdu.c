@@ -1464,3 +1464,90 @@ void helper_pdu_verify_fsu_rsp(const char *file, uint32_t line, struct pdu_data 
 	zassert_equal(sys_le16_to_cpu(pdu->llctrl.fsu_rsp.spacing_type), p->spacing_type,
 		      "spacing_type mismatch.\nCalled at %s:%d\n", file, line);
 }
+
+void helper_pdu_encode_subrate_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_subrate_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, subrate_req) +
+		   sizeof(struct pdu_data_llctrl_subrate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ;
+	pdu->llctrl.subrate_req.subrate_factor_min = sys_cpu_to_le16(p->subrate_factor_min);
+	pdu->llctrl.subrate_req.subrate_factor_max = sys_cpu_to_le16(p->subrate_factor_max);
+	pdu->llctrl.subrate_req.max_latency = sys_cpu_to_le16(p->max_latency);
+	pdu->llctrl.subrate_req.continuation_number = sys_cpu_to_le16(p->continuation_number);
+	pdu->llctrl.subrate_req.timeout = sys_cpu_to_le16(p->timeout);
+}
+
+void helper_pdu_encode_subrate_ind(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_subrate_ind *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, subrate_ind) +
+		   sizeof(struct pdu_data_llctrl_subrate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_IND;
+	pdu->llctrl.subrate_ind.subrate_factor = sys_cpu_to_le16(p->subrate_factor);
+	pdu->llctrl.subrate_ind.subrate_base_event = sys_cpu_to_le16(p->subrate_base_event);
+	pdu->llctrl.subrate_ind.latency = sys_cpu_to_le16(p->latency);
+	pdu->llctrl.subrate_ind.continuation_number = sys_cpu_to_le16(p->continuation_number);
+	pdu->llctrl.subrate_ind.timeout = sys_cpu_to_le16(p->timeout);
+}
+
+void helper_pdu_verify_subrate_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				   void *param)
+{
+	struct pdu_data_llctrl_subrate_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n", file,
+		      line);
+	zassert_equal(pdu->len,
+		      offsetof(struct pdu_data_llctrl, subrate_req) +
+			      sizeof(struct pdu_data_llctrl_subrate_req),
+		      "Wrong length.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ,
+		      "Not a LL_SUBRATE_REQ.\nCalled at %s:%d\n", file, line);
+
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_req.subrate_factor_min),
+		      p->subrate_factor_min, "subrate_factor_min mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_req.subrate_factor_max),
+		      p->subrate_factor_max, "subrate_factor_max mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_req.max_latency), p->max_latency,
+		      "max_latency mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_req.continuation_number),
+		      p->continuation_number, "continuation_number mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_req.timeout), p->timeout,
+		      "timeout mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_subrate_ind(const char *file, uint32_t line, struct pdu_data *pdu,
+				   void *param)
+{
+	struct pdu_data_llctrl_subrate_ind *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n", file,
+		      line);
+	zassert_equal(pdu->len,
+		      offsetof(struct pdu_data_llctrl, subrate_ind) +
+			      sizeof(struct pdu_data_llctrl_subrate_ind),
+		      "Wrong length.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_SUBRATE_IND,
+		      "Not a LL_SUBRATE_IND.\nCalled at %s:%d\n", file, line);
+
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.subrate_factor), p->subrate_factor,
+		      "subrate_factor mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.subrate_base_event),
+		      p->subrate_base_event, "subrate_base_event mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.latency), p->latency,
+		      "latency mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.continuation_number),
+		      p->continuation_number, "continuation_number mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.timeout), p->timeout,
+		      "timeout mismatch.\nCalled at %s:%d\n", file, line);
+}

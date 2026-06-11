@@ -338,6 +338,11 @@ void llcp_lr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 	case PROC_FRAME_SPACE:
 		llcp_lp_comm_rx(conn, ctx, rx);
 		break;
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case PROC_SUBRATE:
+		llcp_lp_sr_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		llcp_lp_comm_rx(conn, ctx, rx);
@@ -490,6 +495,11 @@ static void lr_act_run(struct ll_conn *conn)
 	case PROC_FRAME_SPACE:
 		llcp_lp_comm_run(conn, ctx, NULL);
 		break;
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case PROC_SUBRATE:
+		llcp_lp_sr_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		/* 3rd partam null? */
