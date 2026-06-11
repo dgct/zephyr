@@ -1148,6 +1148,81 @@ uint8_t ull_cp_subrate(struct ll_conn *conn, uint16_t subrate_min, uint16_t subr
 }
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+#if defined(CONFIG_BT_CENTRAL)
+/* Connection-independent acceptable Connection Rate parameters used when a peer
+ * Peripheral requests a connection rate change (Core 6.2, Vol 6, Part B,
+ * 5.1.33). Seeded from Kconfig and overridable through
+ * ull_cp_set_default_rate_params().
+ */
+static struct llcp_conn_rate_defaults default_rate = {
+	.interval_min = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_INTERVAL_MIN,
+	.interval_max = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_INTERVAL_MAX,
+	.factor_min = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_FACTOR_MIN,
+	.factor_max = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_FACTOR_MAX,
+	.max_latency = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_MAX_LATENCY,
+	.continuation_number = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_CONT_NUMBER,
+	.timeout = CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_TIMEOUT,
+};
+
+const struct llcp_conn_rate_defaults *llcp_conn_rate_defaults_get(void)
+{
+	return &default_rate;
+}
+
+uint8_t ull_cp_set_default_rate_params(uint16_t interval_min, uint16_t interval_max,
+				       uint16_t subrate_min, uint16_t subrate_max,
+				       uint16_t max_latency, uint16_t continuation_number,
+				       uint16_t timeout)
+{
+	default_rate.interval_min = interval_min;
+	default_rate.interval_max = interval_max;
+	default_rate.factor_min = subrate_min;
+	default_rate.factor_max = subrate_max;
+	default_rate.max_latency = max_latency;
+	default_rate.continuation_number = continuation_number;
+	default_rate.timeout = timeout;
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* CONFIG_BT_CENTRAL */
+
+uint8_t ull_cp_conn_rate(struct ll_conn *conn, uint16_t interval_min, uint16_t interval_max,
+			 uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
+			 uint16_t continuation_number, uint16_t timeout)
+{
+	struct proc_ctx *ctx;
+
+	if (!feature_shorter_conn_intervals(conn)) {
+		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
+	}
+
+	ctx = llcp_create_local_procedure(PROC_CONN_RATE);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	/* Store arguments in corresponding procedure context */
+	ctx->data.conn_rate.interval_min = interval_min;
+	ctx->data.conn_rate.interval_max = interval_max;
+	ctx->data.conn_rate.subrate_factor_min = subrate_min;
+	ctx->data.conn_rate.subrate_factor_max = subrate_max;
+	ctx->data.conn_rate.max_latency = max_latency;
+	ctx->data.conn_rate.continuation_number = continuation_number;
+	ctx->data.conn_rate.timeout = timeout;
+	ctx->data.conn_rate.preferred_periodicity = 0U;
+	ctx->data.conn_rate.reference_conn_event_count = 0U;
+	ctx->data.conn_rate.offsets[0] = 0x0000U;
+	ctx->data.conn_rate.offsets[1] = 0xffffU;
+	ctx->data.conn_rate.offsets[2] = 0xffffU;
+	ctx->data.conn_rate.offsets[3] = 0xffffU;
+
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER)
 uint8_t ull_cp_periodic_sync(struct ll_conn *conn, struct ll_sync_set *sync,
 			     struct ll_adv_sync_set *adv_sync, uint16_t service_data)
@@ -1919,6 +1994,20 @@ static bool pdu_validate_subrate_ind(struct pdu_data *pdu)
 }
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+#if defined(CONFIG_BT_CENTRAL)
+static bool pdu_validate_conn_rate_req(struct pdu_data *pdu)
+{
+	return VALIDATE_PDU_LEN(pdu, conn_rate_req);
+}
+#endif /* CONFIG_BT_CENTRAL */
+
+static bool pdu_validate_conn_rate_ind(struct pdu_data *pdu)
+{
+	return VALIDATE_PDU_LEN(pdu, conn_rate_ind);
+}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_CTLR_PHY)
 static bool pdu_validate_phy_req(struct pdu_data *pdu)
 {
@@ -2037,6 +2126,12 @@ static const struct pdu_validate pdu_validate[] = {
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 	[PDU_DATA_LLCTRL_TYPE_SUBRATE_IND] = { pdu_validate_subrate_ind },
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	[PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND] = { pdu_validate_conn_rate_ind },
+#if defined(CONFIG_BT_CENTRAL)
+	[PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ] = { pdu_validate_conn_rate_req },
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_PHY)
 	[PDU_DATA_LLCTRL_TYPE_PHY_REQ] = { pdu_validate_phy_req },
 #endif /* CONFIG_BT_CTLR_PHY */

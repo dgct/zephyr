@@ -102,6 +102,10 @@ if(CONFIG_BT_CONN)
       CONFIG_BT_CTLR_SUBRATING
       ll_sw/ull_llcp_subrate.c
     )
+    zephyr_library_sources_ifdef(
+      CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS
+      ll_sw/ull_llcp_conn_rate.c
+    )
     if(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER OR
         CONFIG_BT_CTLR_SYNC_TRANSFER_RECEIVER)
       zephyr_library_sources(

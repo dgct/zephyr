@@ -343,6 +343,11 @@ void llcp_lr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 		llcp_lp_sr_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case PROC_CONN_RATE:
+		llcp_lp_cr_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		llcp_lp_comm_rx(conn, ctx, rx);
@@ -505,6 +510,11 @@ static void lr_act_run(struct ll_conn *conn)
 		llcp_lp_sr_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case PROC_CONN_RATE:
+		llcp_lp_cr_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		/* 3rd partam null? */

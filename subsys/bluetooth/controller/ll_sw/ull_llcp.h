@@ -151,6 +151,29 @@ uint8_t ull_cp_set_default_subrate(uint16_t subrate_min, uint16_t subrate_max,
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+/**
+ * @brief Initiate a Connection Rate Update (Central) or Connection Rate Request
+ *        (Peripheral) Procedure (Shorter Connection Intervals; Core 6.2,
+ *        Vol 6, Part B, 5.1.32 / 5.1.33).
+ */
+uint8_t ull_cp_conn_rate(struct ll_conn *conn, uint16_t interval_min, uint16_t interval_max,
+			 uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
+			 uint16_t continuation_number, uint16_t timeout);
+
+#if defined(CONFIG_BT_CENTRAL)
+/**
+ * @brief Set the Central's connection-independent acceptable Connection Rate
+ *        parameters used when answering a peer Peripheral's
+ *        LL_CONNECTION_RATE_REQ.
+ */
+uint8_t ull_cp_set_default_rate_params(uint16_t interval_min, uint16_t interval_max,
+				       uint16_t subrate_min, uint16_t subrate_max,
+				       uint16_t max_latency, uint16_t continuation_number,
+				       uint16_t timeout);
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 /**
  * @brief Accept the remote device’s request to change connection parameters.
  */

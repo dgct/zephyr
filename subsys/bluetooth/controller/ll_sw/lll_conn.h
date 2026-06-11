@@ -173,6 +173,16 @@ struct lll_conn {
 	} subrate;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	/* Shorter Connection Intervals negotiated state (Core 6.2, Vol 6,
+	 * Part B, Sect 4.5.1 / 5.1.32). When set, lll->interval is expressed in
+	 * CONN_SCI_INT_UNIT_US (125 us) units instead of the classic
+	 * CONN_INT_UNIT_US (1250 us) unit; the subrate factor / base event /
+	 * continuation number above carry the subrated listening cadence.
+	 */
+	uint8_t sci_active:1;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_CTLR_PHY)
 	uint8_t phy_tx:3;
 	uint8_t phy_flags:1;

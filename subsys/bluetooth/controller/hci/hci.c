@@ -2663,6 +2663,70 @@ static void le_conn_param_req_neg_reply(struct net_buf *buf,
 }
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+static void le_connection_rate_request(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_op_le_connection_rate_request *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_conn_rate(handle,
+			      sys_le16_to_cpu(cmd->conn_interval_min),
+			      sys_le16_to_cpu(cmd->conn_interval_max),
+			      sys_le16_to_cpu(cmd->subrate_min),
+			      sys_le16_to_cpu(cmd->subrate_max),
+			      sys_le16_to_cpu(cmd->max_latency),
+			      sys_le16_to_cpu(cmd->continuation_number),
+			      sys_le16_to_cpu(cmd->supervision_timeout));
+
+	*evt = cmd_status(status);
+}
+
+#if defined(CONFIG_BT_CENTRAL)
+static void le_set_default_rate_parameters(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_op_le_set_default_rate_parameters *cmd = (void *)buf->data;
+	struct bt_hci_evt_cc_status *ccst;
+	uint8_t status;
+
+	status = ll_set_default_rate_params(
+			sys_le16_to_cpu(cmd->conn_interval_min),
+			sys_le16_to_cpu(cmd->conn_interval_max),
+			sys_le16_to_cpu(cmd->subrate_min),
+			sys_le16_to_cpu(cmd->subrate_max),
+			sys_le16_to_cpu(cmd->max_latency),
+			sys_le16_to_cpu(cmd->continuation_number),
+			sys_le16_to_cpu(cmd->supervision_timeout));
+
+	ccst = hci_cmd_complete(evt, sizeof(*ccst));
+	ccst->status = status;
+}
+#endif /* CONFIG_BT_CENTRAL */
+
+static void le_read_min_supported_conn_interval(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_op_le_read_min_supported_conn_interval *rp;
+	struct bt_hci_le_read_min_supported_conn_interval_group *grp;
+
+	ARG_UNUSED(buf);
+
+	rp = hci_cmd_complete(evt, sizeof(*rp) + sizeof(*grp));
+
+	rp->status = 0x00;
+	rp->min_supported_conn_interval =
+		BT_HCI_LE_MIN_SUPP_CONN_INT_MIN_US / CONN_SCI_INT_UNIT_US;
+	rp->num_groups = 1U;
+
+	grp = &rp->groups[0];
+	grp->group_min =
+		sys_cpu_to_le16(BT_HCI_LE_MIN_SUPP_CONN_INT_MIN_US / CONN_SCI_INT_UNIT_US);
+	grp->group_max =
+		sys_cpu_to_le16(BT_HCI_LE_MIN_SUPP_CONN_INT_MAX_US / CONN_SCI_INT_UNIT_US);
+	grp->group_stride = sys_cpu_to_le16(BT_HCI_LE_SCI_STRIDE_MIN_125US);
+}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_CTLR_DATA_LENGTH)
 static void le_set_data_len(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4812,6 +4876,22 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_CONN_UPDATE):
 		le_conn_update(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case BT_OCF(BT_HCI_OP_LE_CONNECTION_RATE_REQUEST):
+		le_connection_rate_request(cmd, evt);
+		break;
+
+#if defined(CONFIG_BT_CENTRAL)
+	case BT_OCF(BT_HCI_OP_LE_SET_DEFAULT_RATE_PARAMETERS):
+		le_set_default_rate_parameters(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CENTRAL */
+
+	case BT_OCF(BT_HCI_OP_LE_READ_MIN_SUPPORTED_CONN_INTERVAL):
+		le_read_min_supported_conn_interval(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
 #if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 	case BT_OCF(BT_HCI_OP_LE_CONN_PARAM_REQ_REPLY):
@@ -9213,6 +9293,36 @@ static void le_data_len_change(struct pdu_data *pdu_data, uint16_t handle,
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+static void le_conn_rate_change(struct pdu_data *pdu_data, uint16_t handle,
+				struct net_buf *buf)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p;
+	struct bt_hci_evt_le_conn_rate_change *sep;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_CONN_RATE_CHANGE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_CONN_RATE_CHANGE, sizeof(*sep));
+
+	/* An LL_CONNECTION_RATE_IND is only delivered here on the success path;
+	 * error outcomes are reported via LL_UNKNOWN_RSP / LL_REJECT_EXT_IND.
+	 * The PDU fields are already little-endian, so copy them straight into
+	 * the (also little-endian) event (only the native handle is swapped).
+	 */
+	p = &pdu_data->llctrl.conn_rate_ind;
+	sep->status = 0x00;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->conn_interval = p->interval;
+	sep->subrate_factor = p->subrate_factor;
+	sep->peripheral_latency = p->latency;
+	sep->continuation_number = p->continuation_number;
+	sep->supervision_timeout = p->timeout;
+}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_REMOTE_VERSION)
 static void remote_version_info_encode(struct pdu_data *pdu_data,
 				       uint16_t handle, struct net_buf *buf)
@@ -9300,6 +9410,12 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 	case PDU_DATA_LLCTRL_TYPE_REJECT_EXT_IND:
 		le_reject_ext_ind(pdu_data, handle, buf);
 		break;
+
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND:
+		le_conn_rate_change(pdu_data, handle, buf);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
 	default:
 		LL_ASSERT_DBG(0);

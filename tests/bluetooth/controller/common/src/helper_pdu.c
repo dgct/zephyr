@@ -1551,3 +1551,109 @@ void helper_pdu_verify_subrate_ind(const char *file, uint32_t line, struct pdu_d
 	zassert_equal(sys_le16_to_cpu(pdu->llctrl.subrate_ind.timeout), p->timeout,
 		      "timeout mismatch.\nCalled at %s:%d\n", file, line);
 }
+
+void helper_pdu_encode_conn_rate_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_conn_rate_req *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, conn_rate_req) +
+		   sizeof(struct pdu_data_llctrl_conn_rate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ;
+	pdu->llctrl.conn_rate_req.interval_min = sys_cpu_to_le16(p->interval_min);
+	pdu->llctrl.conn_rate_req.interval_max = sys_cpu_to_le16(p->interval_max);
+	pdu->llctrl.conn_rate_req.subrate_factor_min = sys_cpu_to_le16(p->subrate_factor_min);
+	pdu->llctrl.conn_rate_req.subrate_factor_max = sys_cpu_to_le16(p->subrate_factor_max);
+	pdu->llctrl.conn_rate_req.max_latency = sys_cpu_to_le16(p->max_latency);
+	pdu->llctrl.conn_rate_req.continuation_number = sys_cpu_to_le16(p->continuation_number);
+	pdu->llctrl.conn_rate_req.timeout = sys_cpu_to_le16(p->timeout);
+	pdu->llctrl.conn_rate_req.preferred_periodicity =
+		sys_cpu_to_le16(p->preferred_periodicity);
+	pdu->llctrl.conn_rate_req.reference_conn_event_count =
+		sys_cpu_to_le16(p->reference_conn_event_count);
+	pdu->llctrl.conn_rate_req.offset0 = sys_cpu_to_le16(p->offset0);
+	pdu->llctrl.conn_rate_req.offset1 = sys_cpu_to_le16(p->offset1);
+	pdu->llctrl.conn_rate_req.offset2 = sys_cpu_to_le16(p->offset2);
+	pdu->llctrl.conn_rate_req.offset3 = sys_cpu_to_le16(p->offset3);
+}
+
+void helper_pdu_encode_conn_rate_ind(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, conn_rate_ind) +
+		   sizeof(struct pdu_data_llctrl_conn_rate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND;
+	pdu->llctrl.conn_rate_ind.win_offset = sys_cpu_to_le16(p->win_offset);
+	pdu->llctrl.conn_rate_ind.interval = sys_cpu_to_le16(p->interval);
+	pdu->llctrl.conn_rate_ind.instant = sys_cpu_to_le16(p->instant);
+	pdu->llctrl.conn_rate_ind.subrate_factor = sys_cpu_to_le16(p->subrate_factor);
+	pdu->llctrl.conn_rate_ind.latency = sys_cpu_to_le16(p->latency);
+	pdu->llctrl.conn_rate_ind.continuation_number = sys_cpu_to_le16(p->continuation_number);
+	pdu->llctrl.conn_rate_ind.timeout = sys_cpu_to_le16(p->timeout);
+}
+
+void helper_pdu_verify_conn_rate_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param)
+{
+	struct pdu_data_llctrl_conn_rate_req *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n", file,
+		      line);
+	zassert_equal(pdu->len,
+		      offsetof(struct pdu_data_llctrl, conn_rate_req) +
+			      sizeof(struct pdu_data_llctrl_conn_rate_req),
+		      "Wrong length.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ,
+		      "Not a LL_CONNECTION_RATE_REQ.\nCalled at %s:%d\n", file, line);
+
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.interval_min), p->interval_min,
+		      "interval_min mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.interval_max), p->interval_max,
+		      "interval_max mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.subrate_factor_min),
+		      p->subrate_factor_min, "subrate_factor_min mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.subrate_factor_max),
+		      p->subrate_factor_max, "subrate_factor_max mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.max_latency), p->max_latency,
+		      "max_latency mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.continuation_number),
+		      p->continuation_number, "continuation_number mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_req.timeout), p->timeout,
+		      "timeout mismatch.\nCalled at %s:%d\n", file, line);
+}
+
+void helper_pdu_verify_conn_rate_ind(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL, "Not a Control PDU.\nCalled at %s:%d\n", file,
+		      line);
+	zassert_equal(pdu->len,
+		      offsetof(struct pdu_data_llctrl, conn_rate_ind) +
+			      sizeof(struct pdu_data_llctrl_conn_rate_ind),
+		      "Wrong length.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND,
+		      "Not a LL_CONNECTION_RATE_IND.\nCalled at %s:%d\n", file, line);
+
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.win_offset), p->win_offset,
+		      "win_offset mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.interval), p->interval,
+		      "interval mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.instant), p->instant,
+		      "instant mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.subrate_factor), p->subrate_factor,
+		      "subrate_factor mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.latency), p->latency,
+		      "latency mismatch.\nCalled at %s:%d\n", file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.continuation_number),
+		      p->continuation_number, "continuation_number mismatch.\nCalled at %s:%d\n",
+		      file, line);
+	zassert_equal(sys_le16_to_cpu(pdu->llctrl.conn_rate_ind.timeout), p->timeout,
+		      "timeout mismatch.\nCalled at %s:%d\n", file, line);
+}

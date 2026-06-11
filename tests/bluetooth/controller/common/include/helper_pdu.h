@@ -179,6 +179,14 @@ void helper_pdu_verify_subrate_req(const char *file, uint32_t line, struct pdu_d
 void helper_pdu_verify_subrate_ind(const char *file, uint32_t line, struct pdu_data *pdu,
 				   void *param);
 
+void helper_pdu_encode_conn_rate_req(struct pdu_data *pdu, void *param);
+void helper_pdu_encode_conn_rate_ind(struct pdu_data *pdu, void *param);
+
+void helper_pdu_verify_conn_rate_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param);
+void helper_pdu_verify_conn_rate_ind(const char *file, uint32_t line, struct pdu_data *pdu,
+				     void *param);
+
 void helper_node_verify_peer_sca_update(const char *file, uint32_t line, struct node_rx_pdu *rx,
 				   void *param);
 
@@ -224,6 +232,8 @@ enum helper_pdu_opcode {
 	LL_FRAME_SPACE_RSP,
 	LL_SUBRATE_REQ,
 	LL_SUBRATE_IND,
+	LL_CONNECTION_RATE_REQ,
+	LL_CONNECTION_RATE_IND,
 	LL_ZERO,
 };
 

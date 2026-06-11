@@ -103,6 +103,8 @@ helper_pdu_encode_func_t *const helper_pdu_encode[] = {
 	[LL_FRAME_SPACE_RSP] = helper_pdu_encode_fsu_rsp,
 	[LL_SUBRATE_REQ] = helper_pdu_encode_subrate_req,
 	[LL_SUBRATE_IND] = helper_pdu_encode_subrate_ind,
+	[LL_CONNECTION_RATE_REQ] = helper_pdu_encode_conn_rate_req,
+	[LL_CONNECTION_RATE_IND] = helper_pdu_encode_conn_rate_ind,
 	[LL_ZERO] = helper_pdu_encode_zero,
 };
 
@@ -148,6 +150,8 @@ helper_pdu_verify_func_t *const helper_pdu_verify[] = {
 	[LL_FRAME_SPACE_RSP] = helper_pdu_verify_fsu_rsp,
 	[LL_SUBRATE_REQ] = helper_pdu_verify_subrate_req,
 	[LL_SUBRATE_IND] = helper_pdu_verify_subrate_ind,
+	[LL_CONNECTION_RATE_REQ] = helper_pdu_verify_conn_rate_req,
+	[LL_CONNECTION_RATE_IND] = helper_pdu_verify_conn_rate_ind,
 };
 
 helper_pdu_ntf_verify_func_t *const helper_pdu_ntf_verify[] = {
@@ -191,6 +195,8 @@ helper_pdu_ntf_verify_func_t *const helper_pdu_ntf_verify[] = {
 	[LL_FRAME_SPACE_RSP] = NULL,
 	[LL_SUBRATE_REQ] = NULL,
 	[LL_SUBRATE_IND] = NULL,
+	[LL_CONNECTION_RATE_REQ] = NULL,
+	[LL_CONNECTION_RATE_IND] = NULL,
 };
 
 helper_node_encode_func_t *const helper_node_encode[] = {
@@ -231,6 +237,8 @@ helper_node_encode_func_t *const helper_node_encode[] = {
 	[LL_FRAME_SPACE_RSP] = NULL,
 	[LL_SUBRATE_REQ] = NULL,
 	[LL_SUBRATE_IND] = NULL,
+	[LL_CONNECTION_RATE_REQ] = NULL,
+	[LL_CONNECTION_RATE_IND] = NULL,
 };
 
 helper_node_verify_func_t *const helper_node_verify[] = {
