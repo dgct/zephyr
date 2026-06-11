@@ -2663,6 +2663,25 @@ static void le_conn_param_req_neg_reply(struct net_buf *buf,
 }
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+static void le_subrate_request(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_subrate_request *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_subrate(handle,
+			    sys_le16_to_cpu(cmd->subrate_min),
+			    sys_le16_to_cpu(cmd->subrate_max),
+			    sys_le16_to_cpu(cmd->max_latency),
+			    sys_le16_to_cpu(cmd->continuation_number),
+			    sys_le16_to_cpu(cmd->supervision_timeout));
+
+	*evt = cmd_status(status);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
 static void le_connection_rate_request(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4876,6 +4895,12 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_CONN_UPDATE):
 		le_conn_update(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case BT_OCF(BT_HCI_OP_LE_SUBRATE_REQUEST):
+		le_subrate_request(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
 	case BT_OCF(BT_HCI_OP_LE_CONNECTION_RATE_REQUEST):
