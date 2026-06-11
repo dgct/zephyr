@@ -411,6 +411,11 @@ void llcp_lr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *
 		llcp_lp_past_tx_ack(conn, ctx, tx);
 		break;
 #endif /* defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER) */
+#if defined(CONFIG_BT_CTLR_SUBRATING) && defined(CONFIG_BT_CENTRAL)
+	case PROC_SUBRATE:
+		llcp_lp_sr_tx_ack(conn, ctx, tx);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING && CONFIG_BT_CENTRAL */
 	default:
 		break;
 		/* Ignore tx_ack */
