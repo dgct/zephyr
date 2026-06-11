@@ -216,6 +216,85 @@ void llcp_pdu_decode_feature_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 	conn->llcp.fex.valid = 1;
 }
 
+/*
+ * Extended (page > 0) Feature Exchange Procedure Helpers
+ *
+ * The legacy LL_FEATURE_REQ/RSP carry only page 0 (bits 0..63). The page>0
+ * feature bits (FrameSpaceUpdate=65, ShorterConnInterval=72/73) are exchanged
+ * via LL_FEATURE_EXT_REQ/RSP (BT Core 6.2, Vol 6, Part B, Section 2.4.2.41).
+ * One FeatureSet page travels per PDU; the keyboard only implements page 1.
+ */
+
+void llcp_pdu_encode_feature_ext_req(struct ll_conn *conn, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_feature_ext_req *p;
+
+	ARG_UNUSED(conn);
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(feature_ext_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ;
+
+	p = &pdu->llctrl.feature_ext_req;
+	p->max_page = 1U;
+	p->page_number = 1U;
+	sys_put_le64(ll_feat_get_page1(), p->features);
+}
+
+void llcp_pdu_encode_feature_ext_rsp(struct ll_conn *conn, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_feature_ext_rsp *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(feature_ext_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP;
+
+	p = &pdu->llctrl.feature_ext_rsp;
+	p->max_page = 1U;
+	p->page_number = 1U;
+
+	/* Respond with the negotiated (common) page-1 feature set */
+	sys_put_le64(conn->llcp.fex.features_used_page1, p->features);
+}
+
+void llcp_ntf_encode_feature_ext_rsp(struct ll_conn *conn, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_feature_ext_rsp *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(feature_ext_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP;
+
+	p = &pdu->llctrl.feature_ext_rsp;
+	p->max_page = 1U;
+	p->page_number = 1U;
+	sys_put_le64(conn->llcp.fex.features_peer_page1, p->features);
+}
+
+void llcp_pdu_decode_feature_ext_req(struct ll_conn *conn, struct pdu_data *pdu)
+{
+	uint64_t peer;
+
+	peer = sys_get_le64(pdu->llctrl.feature_ext_req.features);
+	peer &= LL_FEAT_PAGE1_BIT_MASK_VALID;
+
+	conn->llcp.fex.features_peer_page1 = peer;
+	conn->llcp.fex.features_used_page1 = ll_feat_get_page1() & peer;
+	conn->llcp.fex.valid_page1 = 1U;
+}
+
+void llcp_pdu_decode_feature_ext_rsp(struct ll_conn *conn, struct pdu_data *pdu)
+{
+	uint64_t peer;
+
+	peer = sys_get_le64(pdu->llctrl.feature_ext_rsp.features);
+	peer &= LL_FEAT_PAGE1_BIT_MASK_VALID;
+
+	conn->llcp.fex.features_peer_page1 = peer;
+	conn->llcp.fex.features_used_page1 = ll_feat_get_page1() & peer;
+	conn->llcp.fex.valid_page1 = 1U;
+}
+
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 /*
  * Minimum used channels Procedure Helpers

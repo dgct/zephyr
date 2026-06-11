@@ -84,6 +84,11 @@ uint8_t ull_cp_version_exchange(struct ll_conn *conn);
  */
 uint8_t ull_cp_feature_exchange(struct ll_conn *conn, uint8_t host_initiated);
 
+/**
+ * @brief Initiate an Extended (page > 0) Feature Exchange Procedure.
+ */
+uint8_t ull_cp_feature_ext(struct ll_conn *conn, uint8_t host_initiated);
+
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 /**
  * @brief Initiate a Minimum used channels Procedure.

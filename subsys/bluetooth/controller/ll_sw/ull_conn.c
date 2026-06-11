@@ -523,6 +523,28 @@ uint8_t ll_feature_req_send(uint16_t handle)
 }
 #endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG */
 
+uint8_t ll_feature_ext_req_send(uint16_t handle)
+{
+	struct ll_conn *conn;
+	uint8_t err;
+
+	conn = ll_connected_get(handle);
+	if (!conn) {
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
+	}
+
+	err = ull_cp_feature_ext(conn, 1U);
+	if (err) {
+		return err;
+	}
+
+	if (IS_ENABLED(CONFIG_BT_PERIPHERAL) && conn->lll.role) {
+		ull_periph_latency_cancel(conn, handle);
+	}
+
+	return 0;
+}
+
 uint8_t ll_version_ind_send(uint16_t handle)
 {
 	struct ll_conn *conn;

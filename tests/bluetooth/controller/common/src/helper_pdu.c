@@ -107,6 +107,38 @@ void helper_pdu_encode_feature_rsp(struct pdu_data *pdu, void *param)
 	}
 }
 
+void helper_pdu_encode_feature_ext_req(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_feature_ext_req *feature_ext_req = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, feature_ext_req) +
+		   sizeof(struct pdu_data_llctrl_feature_ext_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ;
+	pdu->llctrl.feature_ext_req.max_page = feature_ext_req->max_page;
+	pdu->llctrl.feature_ext_req.page_number = feature_ext_req->page_number;
+	for (int counter = 0; counter < 8; counter++) {
+		pdu->llctrl.feature_ext_req.features[counter] =
+			feature_ext_req->features[counter];
+	}
+}
+
+void helper_pdu_encode_feature_ext_rsp(struct pdu_data *pdu, void *param)
+{
+	struct pdu_data_llctrl_feature_ext_rsp *feature_ext_rsp = param;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = offsetof(struct pdu_data_llctrl, feature_ext_rsp) +
+		   sizeof(struct pdu_data_llctrl_feature_ext_rsp);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP;
+	pdu->llctrl.feature_ext_rsp.max_page = feature_ext_rsp->max_page;
+	pdu->llctrl.feature_ext_rsp.page_number = feature_ext_rsp->page_number;
+	for (int counter = 0; counter < 8; counter++) {
+		pdu->llctrl.feature_ext_rsp.features[counter] =
+			feature_ext_rsp->features[counter];
+	}
+}
+
 void helper_pdu_encode_min_used_chans_ind(struct pdu_data *pdu, void *param)
 {
 	struct pdu_data_llctrl_min_used_chans_ind *p = param;
@@ -611,6 +643,44 @@ void helper_pdu_verify_feature_rsp(const char *file, uint32_t line, struct pdu_d
 		uint8_t expected_value = feature_rsp->features[counter];
 
 		zassert_equal(pdu->llctrl.feature_rsp.features[counter], expected_value,
+			      "Wrong feature data\nCalled at %s:%d\n", file, line);
+	}
+}
+
+void helper_pdu_verify_feature_ext_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				       void *param)
+{
+	struct pdu_data_llctrl_feature_ext_req *feature_ext_req = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ,
+		      "Wrong opcode.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.feature_ext_req.max_page, feature_ext_req->max_page,
+		      "Wrong max_page.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.feature_ext_req.page_number, feature_ext_req->page_number,
+		      "Wrong page_number.\nCalled at %s:%d\n", file, line);
+	for (int counter = 0; counter < 8; counter++) {
+		zassert_equal(pdu->llctrl.feature_ext_req.features[counter],
+			      feature_ext_req->features[counter],
+			      "Wrong feature data\nCalled at %s:%d\n", file, line);
+	}
+}
+
+void helper_pdu_verify_feature_ext_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+				       void *param)
+{
+	struct pdu_data_llctrl_feature_ext_rsp *feature_ext_rsp = param;
+
+	zassert_equal(pdu->ll_id, PDU_DATA_LLID_CTRL);
+	zassert_equal(pdu->llctrl.opcode, PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP,
+		      "Wrong opcode.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.feature_ext_rsp.max_page, feature_ext_rsp->max_page,
+		      "Wrong max_page.\nCalled at %s:%d\n", file, line);
+	zassert_equal(pdu->llctrl.feature_ext_rsp.page_number, feature_ext_rsp->page_number,
+		      "Wrong page_number.\nCalled at %s:%d\n", file, line);
+	for (int counter = 0; counter < 8; counter++) {
+		zassert_equal(pdu->llctrl.feature_ext_rsp.features[counter],
+			      feature_ext_rsp->features[counter],
 			      "Wrong feature data\nCalled at %s:%d\n", file, line);
 	}
 }

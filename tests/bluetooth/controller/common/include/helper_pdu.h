@@ -11,6 +11,8 @@ void helper_pdu_encode_ping_rsp(struct pdu_data *pdu, void *param);
 void helper_pdu_encode_feature_req(struct pdu_data *pdu, void *param);
 void helper_pdu_encode_peripheral_feature_req(struct pdu_data *pdu, void *param);
 void helper_pdu_encode_feature_rsp(struct pdu_data *pdu, void *param);
+void helper_pdu_encode_feature_ext_req(struct pdu_data *pdu, void *param);
+void helper_pdu_encode_feature_ext_rsp(struct pdu_data *pdu, void *param);
 
 void helper_pdu_encode_min_used_chans_ind(struct pdu_data *pdu, void *param);
 
@@ -73,6 +75,10 @@ void helper_pdu_verify_peripheral_feature_req(const char *file, uint32_t line, s
 					      void *param);
 void helper_pdu_verify_feature_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
 				   void *param);
+void helper_pdu_verify_feature_ext_req(const char *file, uint32_t line, struct pdu_data *pdu,
+				       void *param);
+void helper_pdu_verify_feature_ext_rsp(const char *file, uint32_t line, struct pdu_data *pdu,
+				       void *param);
 
 void helper_pdu_verify_min_used_chans_ind(const char *file, uint32_t line, struct pdu_data *pdu,
 					  void *param);
@@ -170,6 +176,8 @@ enum helper_pdu_opcode {
 	LL_FEATURE_REQ,
 	LL_PERIPH_FEAT_XCHG,
 	LL_FEATURE_RSP,
+	LL_FEATURE_EXT_REQ,
+	LL_FEATURE_EXT_RSP,
 	LL_MIN_USED_CHANS_IND,
 	LL_REJECT_IND,
 	LL_REJECT_EXT_IND,
