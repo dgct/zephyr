@@ -170,7 +170,7 @@ static void cu_update_conn_parameters(struct ll_conn *conn, struct proc_ctx *ctx
 	ull_conn_update_parameters(conn, (ctx->proc == PROC_CONN_UPDATE), ctx->data.cu.win_size,
 				   ctx->data.cu.win_offset_us, ctx->data.cu.interval_max,
 				   ctx->data.cu.latency, ctx->data.cu.timeout,
-				   ctx->data.cu.instant);
+				   ctx->data.cu.instant, 0U);
 }
 
 #if defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)

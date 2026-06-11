@@ -131,6 +131,14 @@
 #define PDU_DC_CTRL_RX_SIZE_MAX       PDU_DATA_LLCTRL_LEN(cis_req)
 #endif /* !CONFIG_BT_PERIPHERAL */
 
+#elif defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+/* Shorter Connection Intervals: LL_CONNECTION_RATE_REQ (26 octets) is the
+ * largest non-isochronous Data Channel control PDU, exceeding e.g.
+ * conn_param_req (24) and conn_update_ind (11).
+ */
+#define PDU_DC_CTRL_TX_SIZE_MAX       PDU_DATA_LLCTRL_LEN(conn_rate_req)
+#define PDU_DC_CTRL_RX_SIZE_MAX       PDU_DATA_LLCTRL_LEN(conn_rate_req)
+
 #elif defined(CONFIG_BT_CTLR_CONN_PARAM_REQ)
 /* Central and Peripheral with Connection Parameter Request */
 #define PDU_DC_CTRL_TX_SIZE_MAX       PDU_DATA_LLCTRL_LEN(conn_param_req)
@@ -636,6 +644,8 @@ enum pdu_data_llctrl_type {
 	PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP = 0x2C,
 	PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ = 0x3B,
 	PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP = 0x3C,
+	PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ = 0x3E,
+	PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND = 0x3F,
 
 	PDU_DATA_LLCTRL_TYPE_UNUSED = 0xFF
 };
@@ -848,6 +858,32 @@ struct pdu_data_llctrl_subrate_ind {
 	uint16_t timeout;
 } __packed;
 
+struct pdu_data_llctrl_conn_rate_req {
+	uint16_t interval_min;
+	uint16_t interval_max;
+	uint16_t subrate_factor_min;
+	uint16_t subrate_factor_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+	uint16_t preferred_periodicity;
+	uint16_t reference_conn_event_count;
+	uint16_t offset0;
+	uint16_t offset1;
+	uint16_t offset2;
+	uint16_t offset3;
+} __packed;
+
+struct pdu_data_llctrl_conn_rate_ind {
+	uint16_t win_offset;
+	uint16_t interval;
+	uint16_t instant;
+	uint16_t subrate_factor;
+	uint16_t latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+} __packed;
+
 struct pdu_data_llctrl_phy_req {
 	uint8_t tx_phys;
 	uint8_t rx_phys;
@@ -1002,6 +1038,8 @@ struct pdu_data_llctrl {
 		struct pdu_data_llctrl_fsu_rsp fsu_rsp;
 		struct pdu_data_llctrl_subrate_req subrate_req;
 		struct pdu_data_llctrl_subrate_ind subrate_ind;
+		struct pdu_data_llctrl_conn_rate_req conn_rate_req;
+		struct pdu_data_llctrl_conn_rate_ind conn_rate_ind;
 		struct pdu_data_llctrl_phy_req phy_req;
 		struct pdu_data_llctrl_phy_rsp phy_rsp;
 		struct pdu_data_llctrl_phy_upd_ind phy_upd_ind;

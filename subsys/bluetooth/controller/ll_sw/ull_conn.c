@@ -337,6 +337,36 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 	return 0;
 }
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+uint8_t ll_conn_rate(uint16_t handle, uint16_t conn_interval_min, uint16_t conn_interval_max,
+		     uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
+		     uint16_t continuation_number, uint16_t supervision_timeout)
+{
+	struct ll_conn *conn;
+
+	conn = ll_connected_get(handle);
+	if (!conn) {
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
+	}
+
+	return ull_cp_conn_rate(conn, conn_interval_min, conn_interval_max, subrate_min,
+				subrate_max, max_latency, continuation_number,
+				supervision_timeout);
+}
+
+#if defined(CONFIG_BT_CENTRAL)
+uint8_t ll_set_default_rate_params(uint16_t conn_interval_min, uint16_t conn_interval_max,
+				   uint16_t subrate_min, uint16_t subrate_max,
+				   uint16_t max_latency, uint16_t continuation_number,
+				   uint16_t supervision_timeout)
+{
+	return ull_cp_set_default_rate_params(conn_interval_min, conn_interval_max, subrate_min,
+					      subrate_max, max_latency, continuation_number,
+					      supervision_timeout);
+}
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 {
 	struct ll_conn *conn;
@@ -724,6 +754,24 @@ uint8_t ll_rssi_get(uint16_t handle, uint8_t *rssi)
 }
 #endif /* CONFIG_BT_CTLR_CONN_RSSI */
 
+/* Connection interval in microseconds. Honours the Shorter Connection Intervals
+ * 125 us interval unit when active (Core 6.2, Vol 6, Part B, 5.1.32); otherwise
+ * the classic 1250 us unit, or 500 us for sub-7.5 ms low-latency intervals.
+ */
+static inline uint32_t conn_interval_us_get(const struct lll_conn *lll)
+{
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	if (lll->sci_active) {
+		return (uint32_t)lll->interval * CONN_SCI_INT_UNIT_US;
+	}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+	if (lll->interval >= BT_HCI_LE_INTERVAL_MIN) {
+		return (uint32_t)lll->interval * CONN_INT_UNIT_US;
+	}
+
+	return (uint32_t)(lll->interval + 1U) * CONN_LOW_LAT_INT_UNIT_US;
+}
+
 #if defined(CONFIG_BT_CTLR_LE_PING)
 uint8_t ll_apto_get(uint16_t handle, uint16_t *apto)
 {
@@ -740,13 +788,8 @@ uint8_t ll_apto_get(uint16_t handle, uint16_t *apto)
 		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
-	if (conn->lll.interval >= BT_HCI_LE_INTERVAL_MIN) {
-		*apto = conn->apto_reload * conn->lll.interval *
-			CONN_INT_UNIT_US / (10U * USEC_PER_MSEC);
-	} else {
-		*apto = conn->apto_reload * (conn->lll.interval + 1U) *
-			CONN_LOW_LAT_INT_UNIT_US / (10U * USEC_PER_MSEC);
-	}
+	*apto = conn->apto_reload * conn_interval_us_get(&conn->lll) /
+		(10U * USEC_PER_MSEC);
 
 	return 0;
 }
@@ -766,17 +809,8 @@ uint8_t ll_apto_set(uint16_t handle, uint16_t apto)
 		return BT_HCI_ERR_UNKNOWN_CONN_ID;
 	}
 
-	if (conn->lll.interval >= BT_HCI_LE_INTERVAL_MIN) {
-		conn->apto_reload =
-			RADIO_CONN_EVENTS(apto * 10U * USEC_PER_MSEC,
-					  conn->lll.interval *
-					  CONN_INT_UNIT_US);
-	} else {
-		conn->apto_reload =
-			RADIO_CONN_EVENTS(apto * 10U * USEC_PER_MSEC,
-					  (conn->lll.interval + 1U) *
-					  CONN_LOW_LAT_INT_UNIT_US);
-	}
+	conn->apto_reload = RADIO_CONN_EVENTS(apto * 10U * USEC_PER_MSEC,
+					      conn_interval_us_get(&conn->lll));
 
 	return 0;
 }
@@ -1180,15 +1214,7 @@ void ull_conn_done(struct node_rx_event_done *done)
 	else {
 		/* Start supervision timeout, if not started already */
 		if (!conn->supervision_expire) {
-			uint32_t conn_interval_us;
-
-			if (conn->lll.interval >= BT_HCI_LE_INTERVAL_MIN) {
-				conn_interval_us = conn->lll.interval *
-						   CONN_INT_UNIT_US;
-			} else {
-				conn_interval_us = (conn->lll.interval + 1U) *
-						   CONN_LOW_LAT_INT_UNIT_US;
-			}
+			uint32_t conn_interval_us = conn_interval_us_get(&conn->lll);
 
 			conn->supervision_expire = RADIO_CONN_EVENTS(
 				(conn->supervision_timeout * 10U * USEC_PER_MSEC),
@@ -2347,7 +2373,7 @@ static void ull_conn_update_ticker(struct ll_conn *conn,
 
 void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_t win_size,
 				uint32_t win_offset_us, uint16_t interval, uint16_t latency,
-				uint16_t timeout, uint16_t instant)
+				uint16_t timeout, uint16_t instant, uint8_t is_sci)
 {
 	uint16_t conn_interval_unit_old;
 	uint16_t conn_interval_unit_new;
@@ -2364,9 +2390,23 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 	uint16_t event_counter;
 	uint32_t periodic_us;
 	uint16_t latency_upd;
+	uint32_t conn_win_unit_us;
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	uint8_t sci_new;
+	uint8_t sci_old;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 	struct lll_conn *lll;
 
 	lll = &conn->lll;
+
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	sci_new = (is_sci != 0U);
+	sci_old = (lll->sci_active != 0U);
+	conn_win_unit_us = sci_new ? CONN_SCI_INT_UNIT_US : CONN_INT_UNIT_US;
+#else
+	conn_win_unit_us = CONN_INT_UNIT_US;
+	ARG_UNUSED(is_sci);
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
 	/* Calculate current event counter */
 	event_counter = ull_conn_event_counter_at_prepare(conn);
@@ -2384,6 +2424,12 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 #endif
 
 	/* compensate for instant_latency due to laziness */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	if (sci_old) {
+		conn_interval_old = instant_latency * lll->interval;
+		conn_interval_unit_old = CONN_SCI_INT_UNIT_US;
+	} else
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 	if (lll->interval >= BT_HCI_LE_INTERVAL_MIN) {
 		conn_interval_old = instant_latency * lll->interval;
 		conn_interval_unit_old = CONN_INT_UNIT_US;
@@ -2392,6 +2438,33 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 		conn_interval_unit_old = CONN_LOW_LAT_INT_UNIT_US;
 	}
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	if (sci_new) {
+		/* Shorter Connection Intervals (Core 6.2, Vol 6, Part B,
+		 * 5.1.32): connInterval is expressed in 125 us units. The
+		 * on-air frame spacing (T_IFS) is unchanged - it is governed
+		 * by the Frame Space Update procedure, not by SCI - so the
+		 * default IFS is kept. As for sub-7.5 ms low-latency
+		 * intervals, reserve only the processing overhead; on overlap
+		 * of a short interval the is_abort_cb mechanism keeps the
+		 * anchor-point sync.
+		 */
+		conn_interval_new = interval;
+		conn_interval_unit_new = CONN_SCI_INT_UNIT_US;
+		lll->tifs_tx_us = EVENT_IFS_DEFAULT_US;
+		lll->tifs_rx_us = EVENT_IFS_DEFAULT_US;
+		lll->tifs_hcto_us = EVENT_IFS_DEFAULT_US;
+		for (size_t i = 0; i < FSU_NUM_PHYS; i++) {
+			conn->lll.fsu.perphy[i].fsu_min = EVENT_IFS_DEFAULT_US;
+			conn->lll.fsu.perphy[i].fsu_max = EVENT_IFS_DEFAULT_US;
+			conn->lll.fsu.perphy[i].phys = PHY_1M | PHY_2M | PHY_CODED;
+			conn->lll.fsu.perphy[i].spacing_type =
+				T_IFS_ACL_PC | T_IFS_ACL_CP | T_IFS_CIS;
+		}
+		conn->ull.ticks_slot =
+			HAL_TICKER_US_TO_TICKS_CEIL(EVENT_OVERHEAD_START_US);
+	} else
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 	if (interval >= BT_HCI_LE_INTERVAL_MIN) {
 		uint16_t max_tx_time;
 		uint16_t max_rx_time;
@@ -2516,7 +2589,7 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 		lll->periph.window_widening_max_us = (conn_interval_us >> 1U) - EVENT_IFS_US;
 
 		/* Use requested window size for anchor point at instant, until successful sync */
-		lll->periph.window_size_prepare_us = win_size * CONN_INT_UNIT_US;
+		lll->periph.window_size_prepare_us = win_size * conn_win_unit_us;
 
 		/* Accumulated new window widening for latency events */
 		lll->periph.window_widening_prepare_us += lll->periph.window_widening_periodic_us *
@@ -2530,9 +2603,8 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 					lll->periph.window_widening_periodic_us * latency_upd);
 
 		/* Window Offset */
-		ticks_win_offset = HAL_TICKER_US_TO_TICKS((win_offset_us / CONN_INT_UNIT_US) *
-							  CONN_INT_UNIT_US);
-
+		ticks_win_offset = HAL_TICKER_US_TO_TICKS((win_offset_us / conn_win_unit_us) *
+						  conn_win_unit_us);
 		/* Periodic interval considering window widening */
 		periodic_us -= lll->periph.window_widening_periodic_us;
 
@@ -2558,6 +2630,9 @@ void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc, uint8_
 
 	lll->interval = interval;
 	lll->latency = latency;
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	lll->sci_active = sci_new;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
 	conn->supervision_timeout = timeout;
 	ull_cp_prt_reload_set(conn, conn_interval_us);
@@ -2617,11 +2692,7 @@ void ull_conn_subrate_apply(struct ll_conn *conn, uint16_t subrate_factor,
 	 */
 	conn->supervision_expire = 0U;
 
-	if (lll->interval >= BT_HCI_LE_INTERVAL_MIN) {
-		conn_interval_us = lll->interval * CONN_INT_UNIT_US;
-	} else {
-		conn_interval_us = (lll->interval + 1U) * CONN_LOW_LAT_INT_UNIT_US;
-	}
+	conn_interval_us = conn_interval_us_get(lll);
 
 #if defined(CONFIG_BT_CTLR_LE_PING)
 	/* APTO in no. of connection events (interval is unchanged, but the
@@ -2648,13 +2719,7 @@ void ull_conn_update_peer_sca(struct ll_conn *conn)
 	lll = &conn->lll;
 
 	/* calculate the window widening and interval */
-	if (lll->interval >= BT_HCI_LE_INTERVAL_MIN) {
-		conn_interval_us = lll->interval *
-				   CONN_INT_UNIT_US;
-	} else {
-		conn_interval_us = (lll->interval + 1U) *
-				   CONN_LOW_LAT_INT_UNIT_US;
-	}
+	conn_interval_us = conn_interval_us_get(lll);
 	periodic_us = conn_interval_us;
 
 	lll->periph.window_widening_periodic_us =

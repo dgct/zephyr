@@ -983,6 +983,116 @@ void llcp_pdu_decode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+/*
+ * Connection Rate Update / Request Procedure Helpers (Shorter Connection
+ * Intervals; Core 6.2, Vol 6, Part B, 2.4.2.57 / 2.4.2.58). All interval,
+ * window-offset, periodicity and anchor-offset fields are in 125 us units;
+ * the timeout is in 10 ms units; latency and subrate factor are raw counts.
+ */
+void llcp_pdu_encode_conn_rate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_conn_rate_req *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(conn_rate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ;
+
+	p = &pdu->llctrl.conn_rate_req;
+	p->interval_min = sys_cpu_to_le16(ctx->data.conn_rate.interval_min);
+	p->interval_max = sys_cpu_to_le16(ctx->data.conn_rate.interval_max);
+	p->subrate_factor_min = sys_cpu_to_le16(ctx->data.conn_rate.subrate_factor_min);
+	p->subrate_factor_max = sys_cpu_to_le16(ctx->data.conn_rate.subrate_factor_max);
+	p->max_latency = sys_cpu_to_le16(ctx->data.conn_rate.max_latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.conn_rate.continuation_number);
+	p->timeout = sys_cpu_to_le16(ctx->data.conn_rate.timeout);
+	p->preferred_periodicity = sys_cpu_to_le16(ctx->data.conn_rate.preferred_periodicity);
+	p->reference_conn_event_count =
+		sys_cpu_to_le16(ctx->data.conn_rate.reference_conn_event_count);
+	p->offset0 = sys_cpu_to_le16(ctx->data.conn_rate.offsets[0]);
+	p->offset1 = sys_cpu_to_le16(ctx->data.conn_rate.offsets[1]);
+	p->offset2 = sys_cpu_to_le16(ctx->data.conn_rate.offsets[2]);
+	p->offset3 = sys_cpu_to_le16(ctx->data.conn_rate.offsets[3]);
+}
+
+void llcp_pdu_decode_conn_rate_ind(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p;
+
+	p = &pdu->llctrl.conn_rate_ind;
+	ctx->data.conn_rate.win_offset_us = sys_le16_to_cpu(p->win_offset) * CONN_SCI_INT_UNIT_US;
+	ctx->data.conn_rate.interval = sys_le16_to_cpu(p->interval);
+	ctx->data.conn_rate.instant = sys_le16_to_cpu(p->instant);
+	ctx->data.conn_rate.subrate_factor = sys_le16_to_cpu(p->subrate_factor);
+	ctx->data.conn_rate.latency = sys_le16_to_cpu(p->latency);
+	ctx->data.conn_rate.continuation_number = sys_le16_to_cpu(p->continuation_number);
+	ctx->data.conn_rate.timeout = sys_le16_to_cpu(p->timeout);
+}
+
+void llcp_ntf_encode_conn_rate_change(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(conn_rate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND;
+
+	p = &pdu->llctrl.conn_rate_ind;
+	p->win_offset = sys_cpu_to_le16(ctx->data.conn_rate.win_offset_us / CONN_SCI_INT_UNIT_US);
+	p->interval = sys_cpu_to_le16(ctx->data.conn_rate.interval);
+	p->instant = sys_cpu_to_le16(ctx->data.conn_rate.instant);
+	p->subrate_factor = sys_cpu_to_le16(ctx->data.conn_rate.subrate_factor);
+	p->latency = sys_cpu_to_le16(ctx->data.conn_rate.latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.conn_rate.continuation_number);
+	p->timeout = sys_cpu_to_le16(ctx->data.conn_rate.timeout);
+}
+
+#if defined(CONFIG_BT_CENTRAL)
+/* Central-direction codecs: only the Central originates LL_CONNECTION_RATE_IND
+ * and only the Central decodes a peer Peripheral's LL_CONNECTION_RATE_REQ
+ * (Core 6.2, Vol 6, Part B, 5.1.32 / 5.1.33).
+ */
+void llcp_pdu_encode_conn_rate_ind(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_conn_rate_ind *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(conn_rate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND;
+
+	p = &pdu->llctrl.conn_rate_ind;
+	p->win_offset = sys_cpu_to_le16(ctx->data.conn_rate.win_offset_us / CONN_SCI_INT_UNIT_US);
+	p->interval = sys_cpu_to_le16(ctx->data.conn_rate.interval);
+	p->instant = sys_cpu_to_le16(ctx->data.conn_rate.instant);
+	p->subrate_factor = sys_cpu_to_le16(ctx->data.conn_rate.subrate_factor);
+	p->latency = sys_cpu_to_le16(ctx->data.conn_rate.latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.conn_rate.continuation_number);
+	p->timeout = sys_cpu_to_le16(ctx->data.conn_rate.timeout);
+}
+
+void llcp_pdu_decode_conn_rate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_conn_rate_req *p;
+
+	p = &pdu->llctrl.conn_rate_req;
+	ctx->data.conn_rate.interval_min = sys_le16_to_cpu(p->interval_min);
+	ctx->data.conn_rate.interval_max = sys_le16_to_cpu(p->interval_max);
+	ctx->data.conn_rate.subrate_factor_min = sys_le16_to_cpu(p->subrate_factor_min);
+	ctx->data.conn_rate.subrate_factor_max = sys_le16_to_cpu(p->subrate_factor_max);
+	ctx->data.conn_rate.max_latency = sys_le16_to_cpu(p->max_latency);
+	ctx->data.conn_rate.continuation_number = sys_le16_to_cpu(p->continuation_number);
+	ctx->data.conn_rate.timeout = sys_le16_to_cpu(p->timeout);
+	ctx->data.conn_rate.preferred_periodicity = sys_le16_to_cpu(p->preferred_periodicity);
+	ctx->data.conn_rate.reference_conn_event_count =
+		sys_le16_to_cpu(p->reference_conn_event_count);
+	ctx->data.conn_rate.offsets[0] = sys_le16_to_cpu(p->offset0);
+	ctx->data.conn_rate.offsets[1] = sys_le16_to_cpu(p->offset1);
+	ctx->data.conn_rate.offsets[2] = sys_le16_to_cpu(p->offset2);
+	ctx->data.conn_rate.offsets[3] = sys_le16_to_cpu(p->offset3);
+}
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 /*
  * Constant Tone Request Procedure Helper

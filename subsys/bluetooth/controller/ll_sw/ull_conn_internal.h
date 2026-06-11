@@ -90,7 +90,7 @@ uint16_t ull_conn_event_counter(struct ll_conn *conn);
 void ull_conn_update_parameters(struct ll_conn *conn, uint8_t is_cu_proc,
 				uint8_t win_size, uint32_t win_offset_us,
 				uint16_t interval, uint16_t latency,
-				uint16_t timeout, uint16_t instant);
+				uint16_t timeout, uint16_t instant, uint8_t is_sci);
 
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 void ull_conn_subrate_apply(struct ll_conn *conn, uint16_t subrate_factor,

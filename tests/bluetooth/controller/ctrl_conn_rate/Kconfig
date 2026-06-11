@@ -1,0 +1,37 @@
+# Copyright (c) 2024 Demant A/S
+# SPDX-License-Identifier: Apache-2.0
+
+# LE Shorter Connection Intervals (SCI) control procedure depends on
+# the following configs being set
+
+config SOC_COMPATIBLE_NRF
+	default y
+
+config BT_CTLR_PHY_UPDATE_SUPPORT
+	default y
+
+config BT_CTLR_PHY_CODED_SUPPORT
+	default y
+
+config BT_CTLR_PHY_2M_SUPPORT
+	default y
+
+config BT_CTLR_DATA_LEN_UPDATE_SUPPORT
+	default y
+
+config BT_CTLR_SUBRATING_SUPPORT
+	default y
+
+config BT_CTLR_EXTENDED_FEAT_SET_SUPPORT
+	default y
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_SUPPORT
+	default y
+
+config ENTROPY_NRF5_RNG
+	default n
+
+source "tests/bluetooth/controller/common/Kconfig"
+
+# Include Zephyr's Kconfig
+source "Kconfig"

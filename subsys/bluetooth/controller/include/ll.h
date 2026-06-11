@@ -243,6 +243,17 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 		    uint16_t interval_max, uint16_t latency, uint16_t timeout, uint16_t *offset);
 uint8_t ll_chm_update(uint8_t const *const chm);
 uint8_t ll_chm_get(uint16_t handle, uint8_t *const chm);
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+uint8_t ll_conn_rate(uint16_t handle, uint16_t conn_interval_min, uint16_t conn_interval_max,
+		     uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
+		     uint16_t continuation_number, uint16_t supervision_timeout);
+#if defined(CONFIG_BT_CENTRAL)
+uint8_t ll_set_default_rate_params(uint16_t conn_interval_min, uint16_t conn_interval_max,
+				   uint16_t subrate_min, uint16_t subrate_max,
+				   uint16_t max_latency, uint16_t continuation_number,
+				   uint16_t supervision_timeout);
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 uint8_t ll_enc_req_send(uint16_t handle, uint8_t const *const rand_num, uint8_t const *const ediv,
 			uint8_t const *const ltk);
 uint8_t ll_start_enc_req_send(uint16_t handle, uint8_t err_code,

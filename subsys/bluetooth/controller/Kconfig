@@ -1245,6 +1245,72 @@ config BT_CTLR_SHORTER_CONNECTION_INTERVALS
 	  Enable support for Bluetooth 6.2 Shorter Connection Intervals
 	  in the controller.
 
+if BT_CTLR_SHORTER_CONNECTION_INTERVALS && BT_CENTRAL
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_INTERVAL_MIN
+	int "Acceptable minimum connection interval (1.25 ms / 10 units)"
+	range 6 32000
+	default 60
+	help
+	  Lower bound of the connection interval (in 125 us units) the
+	  Controller will accept when, as a Central, it answers a peer
+	  Peripheral's LL_CONNECTION_RATE_REQ
+	  (Core 6.2, Vol 6, Part B, 5.1.33). 60 units is 7.5 ms.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_INTERVAL_MAX
+	int "Acceptable maximum connection interval (125 us units)"
+	range 6 32000
+	default 32000
+	help
+	  Upper bound of the connection interval (in 125 us units) the
+	  Controller will accept and the largest interval it will grant when,
+	  as a Central, it answers a peer Peripheral's LL_CONNECTION_RATE_REQ.
+	  32000 units is 4 s.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_FACTOR_MIN
+	int "Acceptable minimum subrate factor"
+	range 1 500
+	default 1
+	help
+	  Lower bound of the subrate factor the Controller will accept when, as
+	  a Central, it answers a peer Peripheral's LL_CONNECTION_RATE_REQ.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_FACTOR_MAX
+	int "Acceptable maximum subrate factor"
+	range 1 500
+	default 1
+	help
+	  Upper bound of the subrate factor the Controller will accept and the
+	  largest factor it will grant when, as a Central, it answers a peer
+	  Peripheral's LL_CONNECTION_RATE_REQ.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_MAX_LATENCY
+	int "Acceptable maximum peripheral latency"
+	range 0 499
+	default 0
+	help
+	  Largest Peripheral latency the Controller will accept when, as a
+	  Central, it answers a peer Peripheral's LL_CONNECTION_RATE_REQ.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_CONT_NUMBER
+	int "Acceptable minimum continuation number"
+	range 0 499
+	default 0
+	help
+	  Lower bound of the continuation number the Controller will grant when,
+	  as a Central, it answers a peer Peripheral's LL_CONNECTION_RATE_REQ.
+
+config BT_CTLR_SHORTER_CONNECTION_INTERVALS_DEFAULT_TIMEOUT
+	int "Acceptable maximum supervision timeout (10 ms units)"
+	range 10 3200
+	default 3200
+	help
+	  Largest supervision timeout (in 10 ms units) the Controller will
+	  accept when, as a Central, it answers a peer Peripheral's
+	  LL_CONNECTION_RATE_REQ.
+
+endif # BT_CTLR_SHORTER_CONNECTION_INTERVALS && BT_CENTRAL
+
 rsource "Kconfig.df"
 rsource "Kconfig.ll_sw_split"
 rsource "Kconfig.dtm"

@@ -104,6 +104,7 @@ static bool proc_with_instant(struct proc_ctx *ctx)
 	case PROC_CONN_UPDATE:
 	case PROC_CONN_PARAM_REQ:
 	case PROC_CHAN_MAP_UPDATE:
+	case PROC_CONN_RATE:
 		return 1U;
 	default:
 		/* Unknown procedure */
@@ -306,6 +307,11 @@ void llcp_rr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 		llcp_rp_sr_rx(conn, ctx, rx);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case PROC_CONN_RATE:
+		llcp_rp_cr_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ:
 		llcp_rp_comm_rx(conn, ctx, rx);
@@ -465,6 +471,11 @@ static void rr_act_run(struct ll_conn *conn)
 		llcp_rp_sr_run(conn, ctx, NULL);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	case PROC_CONN_RATE:
+		llcp_rp_cr_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ:
 		llcp_rp_comm_run(conn, ctx, NULL);
@@ -926,6 +937,17 @@ static const struct proc_role new_proc_lut[] = {
 	[PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ] = { PROC_SUBRATE, ACCEPT_ROLE_CENTRAL },
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	/* A peripheral accepts an unsolicited LL_CONNECTION_RATE_IND from the
+	 * central (Core 6.2, Vol 6, Part B, 5.1.32). A central accepts an
+	 * LL_CONNECTION_RATE_REQ from the peripheral and answers it with an
+	 * LL_CONNECTION_RATE_IND or an LL_REJECT_EXT_IND (5.1.33).
+	 */
+	[PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_IND] = { PROC_CONN_RATE, ACCEPT_ROLE_PERIPHERAL },
+#if defined(CONFIG_BT_CENTRAL)
+	[PDU_DATA_LLCTRL_TYPE_CONNECTION_RATE_REQ] = { PROC_CONN_RATE, ACCEPT_ROLE_CENTRAL },
+#endif /* CONFIG_BT_CENTRAL */
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 #if defined(CONFIG_BT_CTLR_PHY)
 	[PDU_DATA_LLCTRL_TYPE_PHY_REQ] = { PROC_PHY_UPDATE, ACCEPT_ROLE_BOTH },
 #endif /* CONFIG_BT_CTLR_PHY */
