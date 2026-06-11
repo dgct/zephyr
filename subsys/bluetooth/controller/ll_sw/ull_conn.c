@@ -337,6 +337,23 @@ uint8_t ll_conn_update(uint16_t handle, uint8_t cmd, uint8_t status, uint16_t in
 	return 0;
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+uint8_t ll_subrate(uint16_t handle, uint16_t subrate_min, uint16_t subrate_max,
+		   uint16_t max_latency, uint16_t continuation_number,
+		   uint16_t supervision_timeout)
+{
+	struct ll_conn *conn;
+
+	conn = ll_connected_get(handle);
+	if (!conn) {
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
+	}
+
+	return ull_cp_subrate(conn, subrate_min, subrate_max, max_latency,
+			      continuation_number, supervision_timeout);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
 uint8_t ll_conn_rate(uint16_t handle, uint16_t conn_interval_min, uint16_t conn_interval_max,
 		     uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
