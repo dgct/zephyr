@@ -140,7 +140,7 @@ static inline bool feature_sca(struct ll_conn *conn)
 #endif
 }
 
-static inline bool feature_frame_space_update(struct ll_conn *conn)
+static inline bool feature_fsu(struct ll_conn *conn)
 {
 #if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
 	return (conn->llcp.fex.features_used_page1 & LL_FEAT_P1_BIT_FRAME_SPACE) != 0;

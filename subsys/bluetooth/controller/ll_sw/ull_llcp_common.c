@@ -208,6 +208,10 @@ static void lp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_LENGTH_RSP;
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		llcp_pdu_encode_fsu_req(conn, pdu);
+		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP;
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		llcp_pdu_encode_cte_req(ctx, pdu);
@@ -299,6 +303,12 @@ static void lp_comm_ntf_length_change(struct ll_conn *conn, struct proc_ctx *ctx
 	llcp_ntf_encode_length_change(conn, pdu);
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+
+static void lp_comm_ntf_fsu_change(struct ll_conn *conn, struct proc_ctx *ctx,
+					   struct pdu_data *pdu)
+{
+	llcp_ntf_encode_fsu_change(conn, pdu);
+}
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 
@@ -436,6 +446,9 @@ static void lp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 		lp_comm_ntf_length_change(conn, ctx, pdu);
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		lp_comm_ntf_fsu_change(conn, ctx, pdu);
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		lp_comm_ntf_cte_req(conn, ctx, pdu);
@@ -584,6 +597,27 @@ static void lp_comm_complete(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 		}
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		if (ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP) {
+			uint8_t fsu_changed = ull_fsu_update_eff(conn);
+
+			if (fsu_changed) {
+				lp_comm_ntf(conn, ctx);
+			}
+			llcp_lr_complete(conn);
+			ctx->state = LP_COMMON_STATE_IDLE;
+
+		} else if (ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP) {
+			/* unmask support for Frame Spacing */
+			llcp_lr_complete(conn);
+			ctx->state = LP_COMMON_STATE_IDLE;
+		} else {
+			/* Illegal response opcode */
+			lp_comm_terminate_invalid_pdu(conn, ctx);
+			break;
+		}
+
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		lp_comm_complete_cte_req(conn, ctx);
@@ -723,6 +757,24 @@ static void lp_comm_send_req(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 		}
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		if (feature_fsu(conn) && !ull_cp_remote_fsu_pending(conn)) {
+			if (llcp_lr_ispaused(conn) || !llcp_tx_alloc_peek(conn, ctx)) {
+				ctx->state = LP_COMMON_STATE_WAIT_TX;
+			} else {
+				/* llcp_tx_pause_data(conn, LLCP_TX_QUEUE_PAUSE_DATA_FRAME_SPACE);
+				 */
+				lp_comm_tx(conn, ctx);
+				ctx->state = LP_COMMON_STATE_WAIT_RX;
+			}
+		} else {
+			/* REQ was received from peer and RSP not yet sent, lets piggy-back on RSP
+			 * instead of sending REQ
+			 */
+			llcp_lr_complete(conn);
+			ctx->state = LP_COMMON_STATE_IDLE;
+		}
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PROC_CTE_REQ:
 		if (conn->llcp.cte_req.is_enabled &&
@@ -868,6 +920,9 @@ static void lp_comm_rx_decode(struct ll_conn *conn, struct proc_ctx *ctx, struct
 		llcp_pdu_decode_length_rsp(conn, pdu);
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP:
+		llcp_pdu_decode_fsu_rsp(conn, pdu);
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PDU_DATA_LLCTRL_TYPE_CTE_RSP:
 		llcp_pdu_decode_cte_rsp(ctx, pdu);
@@ -1067,6 +1122,17 @@ static void rp_comm_rx_decode(struct ll_conn *conn, struct proc_ctx *ctx, struct
 		llcp_rx_node_retain(ctx);
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ:
+		/* receive req from remote */
+		llcp_pdu_decode_fsu_req(conn, pdu);
+		/* Apply the effective frame space now and remember whether it
+		 * changed; the notification decision on TX-ack uses this flag
+		 * (ull_fsu_update_eff() clears the local request state).
+		 */
+		ctx->data.fsu.ntf_fsu = ull_fsu_update_eff(conn);
+
+		llcp_rx_node_retain(ctx);
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PDU_DATA_LLCTRL_TYPE_CTE_REQ:
 		llcp_pdu_decode_cte_req(ctx, pdu);
@@ -1121,6 +1187,18 @@ static void rp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		if (!IS_ENABLED(CONFIG_BT_ISO) &&
+		    ((conn->lll.fsu.local.spacing_type & (T_IFS_CIS | T_MSS_CIS)))) {
+			llcp_pdu_encode_reject_ext_ind(pdu, PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ,
+						       BT_HCI_ERR_UNSUPP_FEATURE_PARAM_VAL);
+		} else {
+			llcp_pdu_encode_fsu_rsp(conn, pdu);
+		}
+		ctx->node_ref.tx_ack = tx;
+		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
+
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ: {
 		uint8_t err_code = 0;
@@ -1187,11 +1265,10 @@ static void rp_comm_st_idle(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t 
 		break;
 	}
 }
-#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+
 static void rp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t generate_ntf)
 {
 	struct node_rx_pdu *ntf;
-	struct pdu_data *pdu;
 
 	/* Allocate ntf node */
 	ntf = ctx->node_ref.rx;
@@ -1205,17 +1282,30 @@ static void rp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t gene
 	ntf->hdr.type = NODE_RX_TYPE_RELEASE;
 
 	if (generate_ntf) {
+		struct pdu_data *pdu;
+
 		ntf->hdr.type = NODE_RX_TYPE_DC_PDU;
 		ntf->hdr.handle = conn->lll.handle;
 		pdu = (struct pdu_data *)ntf->pdu;
-		LL_ASSERT_DBG(ctx->proc == PROC_DATA_LENGTH_UPDATE);
-		llcp_ntf_encode_length_change(conn, pdu);
+
+		switch (ctx->proc) {
+#if defined(CONFIG_BT_CTLR_DATA_LENGTH)
+		case PROC_DATA_LENGTH_UPDATE:
+			llcp_ntf_encode_length_change(conn, pdu);
+			break;
+#endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+		case PROC_FRAME_SPACE:
+			llcp_ntf_encode_fsu_change(conn, pdu);
+			break;
+		default:
+			LL_ASSERT_DBG(0);
+			break;
+		}
 	}
 
 	/* Enqueue notification towards LL - releases mem if no ntf */
 	ll_rx_put_sched(ntf->hdr.link, ntf);
 }
-#endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
 static bool rp_comm_tx_proxy(struct ll_conn *conn, struct proc_ctx *ctx, const bool complete)
 {
@@ -1323,6 +1413,9 @@ static void rp_comm_send_rsp(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 		rp_comm_tx_proxy(conn, ctx, false);
 		break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+	case PROC_FRAME_SPACE:
+		rp_comm_tx_proxy(conn, ctx, false);
+		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ:
 		if (llcp_rr_ispaused(conn) ||
@@ -1413,6 +1506,20 @@ static void rp_comm_st_wait_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, u
 			break;
 		}
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
+		case PROC_FRAME_SPACE: {
+			/* The effective frame space and tifs were already applied
+			 * when the REQ was received (rp_comm_rx_decode). Re-running
+			 * ull_fsu_update_eff() here would recompute eff from the
+			 * now-cleared local request state, dropping the negotiated
+			 * PHY/spacing carried in eff. Use the change flag captured
+			 * at REQ reception to decide on the host notification.
+			 */
+			rp_comm_ntf(conn, ctx, ctx->data.fsu.ntf_fsu);
+
+			llcp_rr_complete(conn);
+			ctx->state = RP_COMMON_STATE_IDLE;
+			break;
+		}
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 		case PROC_CTE_REQ: {
 			/* add PHY update pause = false here */
