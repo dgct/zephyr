@@ -13,7 +13,6 @@ void helper_pdu_encode_peripheral_feature_req(struct pdu_data *pdu, void *param)
 void helper_pdu_encode_feature_rsp(struct pdu_data *pdu, void *param);
 void helper_pdu_encode_feature_ext_req(struct pdu_data *pdu, void *param);
 void helper_pdu_encode_feature_ext_rsp(struct pdu_data *pdu, void *param);
-
 void helper_pdu_encode_min_used_chans_ind(struct pdu_data *pdu, void *param);
 
 void helper_pdu_encode_version_ind(struct pdu_data *pdu, void *param);
@@ -166,6 +165,12 @@ void helper_pdu_verify_sca_rsp(const char *file, uint32_t line, struct pdu_data 
 void helper_pdu_verify_periodic_sync_ind(const char *file, uint32_t line, struct pdu_data *pdu,
 					 void *param);
 
+void helper_pdu_encode_fsu_req(struct pdu_data *pdu, void *param);
+void helper_pdu_encode_fsu_rsp(struct pdu_data *pdu, void *param);
+
+void helper_pdu_verify_fsu_req(const char *file, uint32_t line, struct pdu_data *pdu, void *param);
+void helper_pdu_verify_fsu_rsp(const char *file, uint32_t line, struct pdu_data *pdu, void *param);
+
 void helper_node_verify_peer_sca_update(const char *file, uint32_t line, struct node_rx_pdu *rx,
 				   void *param);
 
@@ -207,6 +212,8 @@ enum helper_pdu_opcode {
 	LL_CIS_IND,
 	LL_CIS_TERMINATE_IND,
 	LL_PERIODIC_SYNC_IND,
+	LL_FRAME_SPACE_REQ,
+	LL_FRAME_SPACE_RSP,
 	LL_ZERO,
 };
 
