@@ -175,6 +175,10 @@ static void lp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 		llcp_pdu_encode_feature_req(conn, pdu);
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_RSP;
 		break;
+	case PROC_FEATURE_EXT:
+		llcp_pdu_encode_feature_ext_req(conn, pdu);
+		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP;
+		break;
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN) && defined(CONFIG_BT_PERIPHERAL)
 	case PROC_MIN_USED_CHANS:
 		llcp_pdu_encode_min_used_chans_ind(ctx, pdu);
@@ -249,6 +253,22 @@ static void lp_comm_ntf_feature_exchange(struct ll_conn *conn, struct proc_ctx *
 	switch (ctx->response_opcode) {
 	case PDU_DATA_LLCTRL_TYPE_FEATURE_RSP:
 		llcp_ntf_encode_feature_rsp(conn, pdu);
+		break;
+	case PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP:
+		llcp_ntf_encode_unknown_rsp(ctx, pdu);
+		break;
+	default:
+		/* Unexpected PDU, should not get through, so ASSERT */
+		LL_ASSERT_DBG(0);
+	}
+}
+
+static void lp_comm_ntf_feature_ext(struct ll_conn *conn, struct proc_ctx *ctx,
+				    struct pdu_data *pdu)
+{
+	switch (ctx->response_opcode) {
+	case PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP:
+		llcp_ntf_encode_feature_ext_rsp(conn, pdu);
 		break;
 	case PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP:
 		llcp_ntf_encode_unknown_rsp(ctx, pdu);
@@ -405,6 +425,9 @@ static void lp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx)
 	case PROC_FEATURE_EXCHANGE:
 		lp_comm_ntf_feature_exchange(conn, ctx, pdu);
 		break;
+	case PROC_FEATURE_EXT:
+		lp_comm_ntf_feature_ext(conn, ctx, pdu);
+		break;
 	case PROC_VERSION_EXCHANGE:
 		lp_comm_ntf_version_ind(conn, ctx, pdu);
 		break;
@@ -466,6 +489,19 @@ static void lp_comm_complete(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 		if ((ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP ||
 		     ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_FEATURE_RSP)) {
 			if (ctx->data.fex.host_initiated) {
+				lp_comm_ntf(conn, ctx);
+			}
+			llcp_lr_complete(conn);
+			ctx->state = LP_COMMON_STATE_IDLE;
+		} else {
+			/* Illegal response opcode */
+			lp_comm_terminate_invalid_pdu(conn, ctx);
+		}
+		break;
+	case PROC_FEATURE_EXT:
+		if ((ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_UNKNOWN_RSP ||
+		     ctx->response_opcode == PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP)) {
+			if (ctx->data.fex_ext.host_initiated) {
 				lp_comm_ntf(conn, ctx);
 			}
 			llcp_lr_complete(conn);
@@ -620,6 +656,9 @@ static void lp_comm_send_req(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 		break;
 #endif /* CONFIG_BT_CTLR_LE_PING */
 	case PROC_FEATURE_EXCHANGE:
+		lp_comm_tx_proxy(conn, ctx, false);
+		break;
+	case PROC_FEATURE_EXT:
 		lp_comm_tx_proxy(conn, ctx, false);
 		break;
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN) && defined(CONFIG_BT_PERIPHERAL)
@@ -806,6 +845,9 @@ static void lp_comm_rx_decode(struct ll_conn *conn, struct proc_ctx *ctx, struct
 		}
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH && CONFIG_BT_CTLR_PHY */
 		break;
+	case PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP:
+		llcp_pdu_decode_feature_ext_rsp(conn, pdu);
+		break;
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 	case PDU_DATA_LLCTRL_TYPE_MIN_USED_CHAN_IND:
 		/* No response expected */
@@ -987,6 +1029,9 @@ static void rp_comm_rx_decode(struct ll_conn *conn, struct proc_ctx *ctx, struct
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH && CONFIG_BT_CTLR_PHY */
 		break;
 #endif /* CONFIG_BT_PERIPHERAL || (CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG && CONFIG_BT_CENTRAL) */
+	case PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ:
+		llcp_pdu_decode_feature_ext_req(conn, pdu);
+		break;
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN) && defined(CONFIG_BT_CENTRAL)
 	case PDU_DATA_LLCTRL_TYPE_MIN_USED_CHAN_IND:
 		llcp_pdu_decode_min_used_chans_ind(conn, pdu);
@@ -1059,6 +1104,10 @@ static void rp_comm_tx(struct ll_conn *conn, struct proc_ctx *ctx)
 #endif /* CONFIG_BT_CTLR_LE_PING */
 	case PROC_FEATURE_EXCHANGE:
 		llcp_pdu_encode_feature_rsp(conn, pdu);
+		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
+		break;
+	case PROC_FEATURE_EXT:
+		llcp_pdu_encode_feature_ext_rsp(conn, pdu);
 		ctx->rx_opcode = PDU_DATA_LLCTRL_TYPE_UNUSED;
 		break;
 	case PROC_VERSION_EXCHANGE:
@@ -1196,6 +1245,10 @@ static void rp_comm_send_rsp(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t
 #endif /* CONFIG_BT_CTLR_LE_PING */
 	case PROC_FEATURE_EXCHANGE:
 		/* Always respond on remote feature exchange */
+		rp_comm_tx_proxy(conn, ctx, true);
+		break;
+	case PROC_FEATURE_EXT:
+		/* Always respond on remote extended feature exchange */
 		rp_comm_tx_proxy(conn, ctx, true);
 		break;
 	case PROC_VERSION_EXCHANGE:

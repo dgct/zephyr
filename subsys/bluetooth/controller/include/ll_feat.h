@@ -262,6 +262,49 @@
  */
 #define LL_FEAT_BIT_MASK_VALID   0xEFF787CF2FULL
 
+/*
+ * Extended (page > 0) FeatureSet support, exchanged via LL_FEATURE_EXT_REQ /
+ * LL_FEATURE_EXT_RSP (BT Core 6.2 Vol 6, Part B, Section 2.4.2.41).
+ *
+ * Page 0 (bits 0..63) keeps its uint64_t representation above byte-for-byte
+ * unchanged. The bits this controller may advertise above bit 63 live in page 1
+ * (bits 64..127) and are stored in a separate uint64_t, where feature bit N is
+ * held at position (N - 64). We only populate the window of bits we implement:
+ * Frame Space Update (65), Shorter Connection Intervals (72), and its
+ * Host Support companion (73).
+ */
+#define LL_FEAT_PAGE1_BIT(bit_number) BIT64((bit_number) - 64)
+
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+#define LL_FEAT_P1_BIT_FRAME_SPACE \
+	LL_FEAT_PAGE1_BIT(BT_LE_FEAT_BIT_FRAME_SPACE_UPDATE)
+#else /* !CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
+#define LL_FEAT_P1_BIT_FRAME_SPACE 0U
+#endif /* !CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+#define LL_FEAT_P1_BIT_SHORTER_CI \
+	LL_FEAT_PAGE1_BIT(BT_LE_FEAT_BIT_SHORTER_CONN_INTERVALS)
+#else /* !CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+#define LL_FEAT_P1_BIT_SHORTER_CI 0U
+#endif /* !CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
+/* Page-1 feature bits of this controller (advertised bits, not host-set) */
+#define LL_FEAT_PAGE1            (LL_FEAT_P1_BIT_FRAME_SPACE | \
+				  LL_FEAT_P1_BIT_SHORTER_CI)
+
+/* Window of page-1 bits this controller understands (bits 64..73) */
+#define LL_FEAT_PAGE1_BIT_MASK   0x3FFULL
+
+/*
+ * Valid page-1 bits per BT Core 6.2 Vol 6, Part B, chapter 4.6: only the
+ * advertisable (non host-support) bits Frame Space Update (65) and Shorter
+ * Connection Intervals (72) are meaningful when received from a peer.
+ */
+#define LL_FEAT_PAGE1_BIT_MASK_VALID \
+	(LL_FEAT_PAGE1_BIT(BT_LE_FEAT_BIT_FRAME_SPACE_UPDATE) | \
+	 LL_FEAT_PAGE1_BIT(BT_LE_FEAT_BIT_SHORTER_CONN_INTERVALS))
+
 /* Mask to filter away octet 0 for feature exchange */
 #define LL_FEAT_FILTER_OCTET0    (LL_FEAT_BIT_MASK & ~0xFFULL)
 
@@ -305,9 +348,30 @@
 #define LL_FEAT_HOST_BITS_ISO_CHANNELS 0U
 #endif /* !CONFIG_BT_CTLR_CONN_ISO */
 
+/* Connection subrating (Host Support) bit is controlled by host */
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+#define LL_FEAT_HOST_BITS_CONN_SUBRATING \
+	BIT64(BT_LE_FEAT_BIT_CONN_SUBRATING_HOST_SUPP)
+#else /* !CONFIG_BT_CTLR_SUBRATING */
 /* Connection subrating not supported and bit thus cannot be set by host */
 #define LL_FEAT_HOST_BITS_CONN_SUBRATING 0U
+#endif /* !CONFIG_BT_CTLR_SUBRATING */
 
 /* Mask for host controlled features */
 #define LL_FEAT_HOST_BIT_MASK  (LL_FEAT_HOST_BITS_ISO_CHANNELS |\
 				LL_FEAT_HOST_BITS_CONN_SUBRATING)
+
+/*
+ * Page-1 host-controlled feature bits. Shorter Connection Intervals carries a
+ * Host Support bit (73) that the Host sets via LE Set Host Feature; it lives in
+ * page 1 (stored at bit 73 - 64 = 9).
+ */
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+#define LL_FEAT_PAGE1_HOST_BITS_SHORTER_CI \
+	LL_FEAT_PAGE1_BIT(BT_LE_FEAT_BIT_SHORTER_CONN_INTERVALS_HOST_SUPP)
+#else /* !CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+#define LL_FEAT_PAGE1_HOST_BITS_SHORTER_CI 0U
+#endif /* !CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
+/* Mask for page-1 host controlled features */
+#define LL_FEAT_PAGE1_HOST_BIT_MASK  (LL_FEAT_PAGE1_HOST_BITS_SHORTER_CI)

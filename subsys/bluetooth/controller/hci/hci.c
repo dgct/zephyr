@@ -1465,6 +1465,22 @@ static void le_read_local_features(struct net_buf *buf, struct net_buf **evt)
 	sys_put_le64(ll_feat_get(), rp->features);
 }
 
+static void le_read_all_local_supported_features(struct net_buf *buf,
+						 struct net_buf **evt)
+{
+	struct bt_hci_rp_le_read_all_local_supported_features *rp;
+
+	rp = hci_cmd_complete(evt, sizeof(*rp));
+
+	rp->status = 0x00;
+	rp->max_page = 1U;
+
+	(void)memset(&rp->features[0], 0x00, sizeof(rp->features));
+	sys_put_le64(ll_feat_get(), &rp->features[0]);
+	sys_put_le64(ll_feat_get_page1(),
+		     &rp->features[BT_HCI_LE_BYTES_PAGE_0_FEATURE_PAGE]);
+}
+
 static void le_set_random_address(struct net_buf *buf, struct net_buf **evt)
 {
 	struct bt_hci_cp_le_set_random_address *cmd = (void *)buf->data;
@@ -2550,6 +2566,19 @@ static void le_read_remote_features(struct net_buf *buf, struct net_buf **evt)
 	*evt = cmd_status(status);
 }
 #endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG */
+
+static void le_read_all_remote_features(struct net_buf *buf,
+					struct net_buf **evt)
+{
+	struct bt_hci_cp_le_read_all_remote_features *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_feature_ext_req_send(handle);
+
+	*evt = cmd_status(status);
+}
 
 static void le_read_chan_map(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4566,6 +4595,10 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		le_read_local_features(cmd, evt);
 		break;
 
+	case BT_OCF(BT_HCI_OP_LE_READ_ALL_LOCAL_SUPPORTED_FEATURES):
+		le_read_all_local_supported_features(cmd, evt);
+		break;
+
 	case BT_OCF(BT_HCI_OP_LE_SET_RANDOM_ADDRESS):
 		le_set_random_address(cmd, evt);
 		break;
@@ -4771,6 +4804,10 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 		le_read_remote_features(cmd, evt);
 		break;
 #endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG */
+
+	case BT_OCF(BT_HCI_OP_LE_READ_ALL_REMOTE_FEATURES):
+		le_read_all_remote_features(cmd, evt);
+		break;
 
 	case BT_OCF(BT_HCI_OP_LE_CONN_UPDATE):
 		le_conn_update(cmd, evt);
@@ -9056,6 +9093,43 @@ static void le_remote_feat_complete(uint8_t status, struct pdu_data *pdu_data,
 	}
 }
 
+static void le_read_all_remote_feat_complete(uint8_t status,
+					     struct pdu_data *pdu_data,
+					     uint16_t handle,
+					     struct net_buf *buf)
+{
+	struct bt_hci_evt_le_read_all_remote_feat_complete *sep;
+	struct ll_conn *conn;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_READ_ALL_REMOTE_FEAT_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_READ_ALL_REMOTE_FEAT_COMPLETE,
+		       sizeof(*sep));
+
+	sep->status = status;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->max_remote_page = 1U;
+	(void)memset(&sep->features[0], 0x00, sizeof(sep->features));
+
+	conn = ll_connected_get(handle);
+	if (status || !conn) {
+		sep->max_valid_page = 0U;
+		return;
+	}
+
+	sep->max_valid_page = 1U;
+
+	/* Page 0 from the earlier (page 0) feature exchange, page 1 from the
+	 * just-completed extended feature exchange.
+	 */
+	sys_put_le64(conn->llcp.fex.features_peer, &sep->features[0]);
+	sys_put_le64(conn->llcp.fex.features_peer_page1,
+		     &sep->features[BT_HCI_LE_BYTES_PAGE_0_FEATURE_PAGE]);
+}
+
 static void le_unknown_rsp(struct pdu_data *pdu_data, uint16_t handle,
 			   struct net_buf *buf)
 {
@@ -9064,6 +9138,10 @@ static void le_unknown_rsp(struct pdu_data *pdu_data, uint16_t handle,
 	case PDU_DATA_LLCTRL_TYPE_PER_INIT_FEAT_XCHG:
 		le_remote_feat_complete(BT_HCI_ERR_UNSUPP_REMOTE_FEATURE,
 					    NULL, handle, buf);
+		break;
+	case PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ:
+		le_read_all_remote_feat_complete(BT_HCI_ERR_UNSUPP_REMOTE_FEATURE,
+						 NULL, handle, buf);
 		break;
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 	case PDU_DATA_LLCTRL_TYPE_CTE_REQ:
@@ -9183,6 +9261,10 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 
 	case PDU_DATA_LLCTRL_TYPE_FEATURE_RSP:
 		le_remote_feat_complete(0x00, pdu_data, handle, buf);
+		break;
+
+	case PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP:
+		le_read_all_remote_feat_complete(0x00, pdu_data, handle, buf);
 		break;
 
 #if defined(CONFIG_BT_CTLR_LE_ENC)

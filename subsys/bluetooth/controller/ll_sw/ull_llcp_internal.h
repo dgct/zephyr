@@ -15,6 +15,7 @@ enum llcp_proc {
 	PROC_UNKNOWN,
 	PROC_LE_PING,
 	PROC_FEATURE_EXCHANGE,
+	PROC_FEATURE_EXT,
 	PROC_MIN_USED_CHANS,
 	PROC_VERSION_EXCHANGE,
 	PROC_ENCRYPTION_START,
@@ -188,6 +189,10 @@ struct proc_ctx {
 		struct {
 			uint8_t host_initiated:1;
 		} fex;
+		/* Extended (page > 0) Feature Exchange Procedure */
+		struct {
+			uint8_t host_initiated:1;
+		} fex_ext;
 		/* Used by Minimum Used Channels Procedure */
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)
 		struct {
@@ -640,6 +645,20 @@ void llcp_ntf_encode_feature_req(struct ll_conn *conn,
 void llcp_pdu_decode_feature_req(struct ll_conn *conn,
 					struct pdu_data *pdu);
 void llcp_pdu_decode_feature_rsp(struct ll_conn *conn,
+					struct pdu_data *pdu);
+
+/*
+ * Extended (page > 0) Feature Exchange Procedure Helper
+ */
+void llcp_pdu_encode_feature_ext_req(struct ll_conn *conn,
+					struct pdu_data *pdu);
+void llcp_pdu_encode_feature_ext_rsp(struct ll_conn *conn,
+					struct pdu_data *pdu);
+void llcp_ntf_encode_feature_ext_rsp(struct ll_conn *conn,
+					struct pdu_data *pdu);
+void llcp_pdu_decode_feature_ext_req(struct ll_conn *conn,
+					struct pdu_data *pdu);
+void llcp_pdu_decode_feature_ext_rsp(struct ll_conn *conn,
 					struct pdu_data *pdu);
 
 #if defined(CONFIG_BT_CTLR_MIN_USED_CHAN)

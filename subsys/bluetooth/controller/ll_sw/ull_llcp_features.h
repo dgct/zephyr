@@ -140,6 +140,33 @@ static inline bool feature_sca(struct ll_conn *conn)
 #endif
 }
 
+static inline bool feature_frame_space_update(struct ll_conn *conn)
+{
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	return (conn->llcp.fex.features_used_page1 & LL_FEAT_P1_BIT_FRAME_SPACE) != 0;
+#else
+	return 0;
+#endif
+}
+
+static inline bool feature_shorter_conn_intervals(struct ll_conn *conn)
+{
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	return (conn->llcp.fex.features_used_page1 & LL_FEAT_P1_BIT_SHORTER_CI) != 0;
+#else
+	return 0;
+#endif
+}
+
+static inline bool feature_subrating(struct ll_conn *conn)
+{
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	return (conn->llcp.fex.features_used & BIT64(BT_LE_FEAT_BIT_CONN_SUBRATING)) != 0;
+#else
+	return 0;
+#endif
+}
+
 /*
  * for asymmetric features we can check either if we support it
  * or if the peer supports it
