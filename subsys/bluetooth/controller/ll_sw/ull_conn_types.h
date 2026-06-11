@@ -89,6 +89,11 @@ struct llcp_struct {
 	struct {
 		uint8_t valid;
 		/*
+		 * Set to 1 once the extended (page > 0) feature exchange
+		 * (LL_FEATURE_EXT_REQ/RSP) has completed for this connection.
+		 */
+		uint8_t valid_page1;
+		/*
 		 * Stores features supported by peer device. The content of the member may be
 		 * verified when feature exchange procedure has completed, valid member is set to 1.
 		 */
@@ -100,6 +105,13 @@ struct llcp_struct {
 		 * may be limited to features that are common.
 		 */
 		uint64_t features_used;
+		/*
+		 * Page-1 (bits 64..127) counterparts of features_peer/features_used,
+		 * negotiated via LL_FEATURE_EXT_REQ/RSP. Feature bit N is stored at
+		 * position (N - 64). Valid once valid_page1 is set.
+		 */
+		uint64_t features_peer_page1;
+		uint64_t features_used_page1;
 	} fex;
 
 	/* Minimum used channels procedure state */

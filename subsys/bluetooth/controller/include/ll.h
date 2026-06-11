@@ -19,6 +19,7 @@ void ll_reset(void);
 /* Features Interfaces */
 uint8_t ll_set_host_feature(uint8_t bit_number, uint8_t bit_value);
 uint64_t ll_feat_get(void);
+uint64_t ll_feat_get_page1(void);
 
 /* Device Address Interfaces */
 uint8_t ll_addr_set(uint8_t addr_type, uint8_t const *const p_bdaddr);
@@ -248,6 +249,7 @@ uint8_t ll_start_enc_req_send(uint16_t handle, uint8_t err_code,
 			   uint8_t const *const ltk);
 uint8_t ll_req_peer_sca(uint16_t handle);
 uint8_t ll_feature_req_send(uint16_t handle);
+uint8_t ll_feature_ext_req_send(uint16_t handle);
 uint8_t ll_version_ind_send(uint16_t handle);
 uint8_t ll_terminate_ind_send(uint16_t handle, uint8_t reason);
 uint8_t ll_rssi_get(uint16_t handle, uint8_t *const rssi);

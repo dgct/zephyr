@@ -653,6 +653,22 @@ uint8_t ull_cp_feature_exchange(struct ll_conn *conn, uint8_t host_initiated)
 }
 #endif /* CONFIG_BT_CENTRAL || CONFIG_BT_CTLR_PER_INIT_FEAT_XCHG */
 
+uint8_t ull_cp_feature_ext(struct ll_conn *conn, uint8_t host_initiated)
+{
+	struct proc_ctx *ctx;
+
+	ctx = llcp_create_local_procedure(PROC_FEATURE_EXT);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	ctx->data.fex_ext.host_initiated = host_initiated;
+
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+
 uint8_t ull_cp_version_exchange(struct ll_conn *conn)
 {
 	struct proc_ctx *ctx;
@@ -1697,6 +1713,16 @@ static bool pdu_validate_feature_rsp(struct pdu_data *pdu)
 }
 #endif
 
+static bool pdu_validate_feature_ext_req(struct pdu_data *pdu)
+{
+	return VALIDATE_PDU_LEN(pdu, feature_ext_req);
+}
+
+static bool pdu_validate_feature_ext_rsp(struct pdu_data *pdu)
+{
+	return VALIDATE_PDU_LEN(pdu, feature_ext_rsp);
+}
+
 #if defined(CONFIG_BT_CTLR_LE_ENC) && defined(CONFIG_BT_PERIPHERAL)
 static bool pdu_validate_pause_enc_req(struct pdu_data *pdu)
 {
@@ -1856,6 +1882,8 @@ static const struct pdu_validate pdu_validate[] = {
 #if defined(CONFIG_BT_CENTRAL)
 	[PDU_DATA_LLCTRL_TYPE_FEATURE_RSP] = { pdu_validate_feature_rsp },
 #endif
+	[PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ] = { pdu_validate_feature_ext_req },
+	[PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP] = { pdu_validate_feature_ext_rsp },
 #if defined(CONFIG_BT_CTLR_LE_ENC) && defined(CONFIG_BT_PERIPHERAL)
 	[PDU_DATA_LLCTRL_TYPE_PAUSE_ENC_REQ] = { pdu_validate_pause_enc_req },
 #endif /* CONFIG_BT_CTLR_LE_ENC && CONFIG_BT_PERIPHERAL */

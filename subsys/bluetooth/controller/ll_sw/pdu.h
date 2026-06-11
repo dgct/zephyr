@@ -624,6 +624,8 @@ enum pdu_data_llctrl_type {
 	PDU_DATA_LLCTRL_TYPE_CIS_RSP = 0x20,
 	PDU_DATA_LLCTRL_TYPE_CIS_IND = 0x21,
 	PDU_DATA_LLCTRL_TYPE_CIS_TERMINATE_IND = 0x22,
+	PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_REQ = 0x2B,
+	PDU_DATA_LLCTRL_TYPE_FEATURE_EXT_RSP = 0x2C,
 	PDU_DATA_LLCTRL_TYPE_UNUSED = 0xFF
 };
 
@@ -674,6 +676,24 @@ struct pdu_data_llctrl_feature_req {
 } __packed;
 
 struct pdu_data_llctrl_feature_rsp {
+	uint8_t features[8];
+} __packed;
+
+/* LL_FEATURE_EXT_REQ / LL_FEATURE_EXT_RSP CtrData (BT Core 6.2 Vol 6, Part B,
+ * Section 2.4.2.41): one FeatureSet page carried per PDU.
+ *   max_page    - highest non-zero page number of the sender's FeatureSet
+ *   page_number - page number carried in this PDU (0x01..0x0A)
+ *   features    - the 8 octets of page page_number
+ */
+struct pdu_data_llctrl_feature_ext_req {
+	uint8_t max_page;
+	uint8_t page_number;
+	uint8_t features[8];
+} __packed;
+
+struct pdu_data_llctrl_feature_ext_rsp {
+	uint8_t max_page;
+	uint8_t page_number;
 	uint8_t features[8];
 } __packed;
 
@@ -924,6 +944,8 @@ struct pdu_data_llctrl {
 		struct pdu_data_llctrl_unknown_rsp unknown_rsp;
 		struct pdu_data_llctrl_feature_req feature_req;
 		struct pdu_data_llctrl_feature_rsp feature_rsp;
+		struct pdu_data_llctrl_feature_ext_req feature_ext_req;
+		struct pdu_data_llctrl_feature_ext_rsp feature_ext_rsp;
 		struct pdu_data_llctrl_pause_enc_req pause_enc_req;
 		struct pdu_data_llctrl_pause_enc_rsp pause_enc_rsp;
 		struct pdu_data_llctrl_version_ind version_ind;
