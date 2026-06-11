@@ -589,6 +589,13 @@ void llcp_lp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
  */
 void llcp_rp_sr_rx(struct ll_conn *conn, struct proc_ctx *ctx, struct node_rx_pdu *rx);
 void llcp_rp_sr_run(struct ll_conn *conn, struct proc_ctx *ctx, void *param);
+#if defined(CONFIG_BT_CENTRAL)
+/* Central applies its negotiated subrate on the Link Layer acknowledgment of
+ * the LL_SUBRATE_IND it transmits (Core 5.4, Vol 6, Part B, 5.1.19).
+ */
+void llcp_lp_sr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *tx);
+void llcp_rp_sr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *tx);
+#endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
 /*
@@ -807,6 +814,23 @@ void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
 void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
 void llcp_ntf_encode_subrate_change(struct proc_ctx *ctx, struct pdu_data *pdu);
+#if defined(CONFIG_BT_CENTRAL)
+void llcp_pdu_encode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu);
+void llcp_pdu_decode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu);
+
+/* Central-side acceptable Connection Subrate parameters, used to negotiate a
+ * peer Peripheral's LL_SUBRATE_REQ (Core 5.4, Vol 6, Part B, 5.1.20).
+ */
+struct llcp_subrate_defaults {
+	uint16_t factor_min;
+	uint16_t factor_max;
+	uint16_t max_latency;
+	uint16_t continuation_number;
+	uint16_t timeout;
+};
+
+const struct llcp_subrate_defaults *llcp_subrate_defaults_get(void);
+#endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
 #if defined(CONFIG_BT_CTLR_SCA_UPDATE)
