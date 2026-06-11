@@ -418,3 +418,482 @@ ZTEST(subrate_loc, test_subrate_peripheral_loc_unknown_rsp)
 
 ZTEST_SUITE(subrate_loc, NULL, NULL, subrate_setup, NULL, NULL);
 ZTEST_SUITE(subrate_rem, NULL, NULL, subrate_setup, NULL, NULL);
+
+/*
+ * Central-side Connection Subrating (Core 5.4, Vol 6, Part B, 5.1.19/5.1.20).
+ *
+ * A Central both originates the subrate change (it transmits LL_SUBRATE_IND
+ * directly, with no LL_SUBRATE_REQ) and answers a peer Peripheral's
+ * LL_SUBRATE_REQ. In all cases the negotiated parameters are applied on the
+ * Link Layer acknowledgment of the transmitted LL_SUBRATE_IND, not when it is
+ * queued.
+ */
+
+static void subrate_central_setup(void *data)
+{
+	test_setup(&conn);
+
+	/* Emulate a completed feature exchange in which the peer supports
+	 * LE Connection Subrating.
+	 */
+	conn.llcp.fex.features_used |= BIT64(BT_LE_FEAT_BIT_CONN_SUBRATING);
+	conn.llcp.fex.valid = 1U;
+
+	/* Baseline acceptable defaults for the Central responder. Individual
+	 * tests override these as needed (the store is global, not per-conn).
+	 */
+	ull_cp_set_default_subrate(1, 10, 20, 0, 1000);
+}
+
+/*
+ * Remotely-initiated (peer Peripheral) Connection Subrate Update - Central
+ * accepts.
+ *
+ * +-----+                    +-------+                    +-----+
+ * | UT  |                    | LL_C  |                    | LT  |
+ * +-----+                    +-------+                    +-----+
+ *    |                           |        LL_SUBRATE_REQ      |
+ *    |                           |<--------------------------|
+ *    |                           | LL_SUBRATE_IND            |
+ *    |                           |-------------------------->|
+ *    |                           |              (LL ack)      |
+ *    | Subrate Change            |<--------------------------|
+ *    |  (applied on ack)         |                           |
+ *    |<--------------------------|                           |
+ *    |                           |                           |
+ */
+ZTEST(subrate_central_rem, test_subrate_central_rem)
+{
+	struct node_tx *tx;
+	struct node_rx_pdu *ntf;
+
+	struct pdu_data_llctrl_subrate_req remote_req = {
+		.subrate_factor_min = 2,
+		.subrate_factor_max = 8,
+		.max_latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ind = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0, /* set from event_counter() below */
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ntf = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0, /* set below to match exp_ind */
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Rx the peer Peripheral's LL_SUBRATE_REQ */
+	event_prepare(&conn);
+	lt_tx(LL_SUBRATE_REQ, &conn, &remote_req);
+	event_done(&conn);
+
+	/* The Central answers with LL_SUBRATE_IND carrying the negotiated
+	 * parameters. The subrate base event equals the connection event
+	 * counter at the time the indication was queued.
+	 */
+	event_prepare(&conn);
+	exp_ind.subrate_base_event = event_counter(&conn);
+	exp_ntf.subrate_base_event = exp_ind.subrate_base_event;
+	lt_rx(LL_SUBRATE_IND, &conn, &tx, &exp_ind);
+	lt_rx_q_is_empty(&conn);
+
+	/* Nothing is applied until the indication is acknowledged */
+	zassert_equal(conn.lll.subrate.factor, 0, "subrate factor applied early %u",
+		      conn.lll.subrate.factor);
+
+	/* Ack the LL_SUBRATE_IND */
+	event_tx_ack(&conn, tx);
+	event_done(&conn);
+
+	/* The host is notified of the applied subrate parameters */
+	ut_rx_pdu(LL_SUBRATE_IND, &ntf, &exp_ntf);
+	ut_rx_q_is_empty();
+
+	/* Verify the negotiated subrate parameters were applied on ack */
+	zassert_equal(conn.lll.subrate.factor, 8, "subrate factor %u", conn.lll.subrate.factor);
+	zassert_equal(conn.lll.subrate.base_event, exp_ind.subrate_base_event,
+		      "subrate base_event %u", conn.lll.subrate.base_event);
+	zassert_equal(conn.lll.subrate.continuation_number, 1, "subrate cont %u",
+		      conn.lll.subrate.continuation_number);
+	zassert_equal(conn.lll.latency, 5, "latency %u", conn.lll.latency);
+	zassert_equal(conn.supervision_timeout, 500, "supervision timeout %u",
+		      conn.supervision_timeout);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+	release_ntf(ntf);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+/*
+ * Remotely-initiated (peer Peripheral) Connection Subrate Update - Central
+ * rejects unacceptable parameters.
+ *
+ * The request's supervision timeout is too small for the requested factor and
+ * latency, so the Central answers with LL_REJECT_EXT_IND. Because the procedure
+ * was peer-initiated and produced no parameter change, the host is NOT notified
+ * (Core 5.4, Vol 4, Part E, 7.7.65.30) and nothing is applied.
+ */
+ZTEST(subrate_central_rem, test_subrate_central_rem_reject)
+{
+	struct node_tx *tx;
+
+	struct pdu_data_llctrl_subrate_req remote_req = {
+		.subrate_factor_min = 2,
+		.subrate_factor_max = 8,
+		.max_latency = 10,
+		/* factor_min*(max_latency+1)*interval = 2*11*6 = 132 is NOT
+		 * < timeout*4 = 40
+		 */
+		.timeout = 10,
+		.continuation_number = 1,
+	};
+
+	struct pdu_data_llctrl_reject_ext_ind exp_reject = {
+		.reject_opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ,
+		.error_code = BT_HCI_ERR_UNSUPP_LL_PARAM_VAL,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Rx the peer Peripheral's LL_SUBRATE_REQ */
+	event_prepare(&conn);
+	lt_tx(LL_SUBRATE_REQ, &conn, &remote_req);
+	event_done(&conn);
+
+	/* The Central rejects with LL_REJECT_EXT_IND */
+	event_prepare(&conn);
+	lt_rx(LL_REJECT_EXT_IND, &conn, &tx, &exp_reject);
+	lt_rx_q_is_empty(&conn);
+	event_done(&conn);
+
+	/* No host notification for a rejected peer-initiated procedure */
+	ut_rx_q_is_empty();
+
+	/* No subrate parameters applied */
+	zassert_equal(conn.lll.subrate.factor, 0, "subrate factor unexpectedly set to %u",
+		      conn.lll.subrate.factor);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+/*
+ * Remotely-initiated (peer Peripheral) Connection Subrate Update - the feature
+ * is not usable on this connection.
+ *
+ * The Central rejects with LL_REJECT_EXT_IND / BT_HCI_ERR_UNSUPP_REMOTE_FEATURE
+ * and does not notify the host or apply any parameters.
+ */
+ZTEST(subrate_central_rem, test_subrate_central_rem_unsupported)
+{
+	struct node_tx *tx;
+
+	struct pdu_data_llctrl_subrate_req remote_req = {
+		.subrate_factor_min = 2,
+		.subrate_factor_max = 8,
+		.max_latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_reject_ext_ind exp_reject = {
+		.reject_opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ,
+		.error_code = BT_HCI_ERR_UNSUPP_REMOTE_FEATURE,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* The feature is not usable on this connection */
+	feature_unmask_features(&conn, BIT64(BT_LE_FEAT_BIT_CONN_SUBRATING));
+	zassert_false(feature_subrating(&conn), "subrating feature still enabled");
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Rx the peer Peripheral's LL_SUBRATE_REQ */
+	event_prepare(&conn);
+	lt_tx(LL_SUBRATE_REQ, &conn, &remote_req);
+	event_done(&conn);
+
+	/* The Central rejects with unsupported-remote-feature */
+	event_prepare(&conn);
+	lt_rx(LL_REJECT_EXT_IND, &conn, &tx, &exp_reject);
+	lt_rx_q_is_empty(&conn);
+	event_done(&conn);
+
+	/* No host notification */
+	ut_rx_q_is_empty();
+
+	/* No subrate parameters applied */
+	zassert_equal(conn.lll.subrate.factor, 0, "subrate factor unexpectedly set to %u",
+		      conn.lll.subrate.factor);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+/*
+ * Remotely-initiated (peer Peripheral) Connection Subrate Update - the granted
+ * subrate factor is clamped to the Central's acceptable maximum and the
+ * continuation number is raised to the Central's minimum.
+ */
+ZTEST(subrate_central_rem, test_subrate_central_rem_clamp)
+{
+	struct node_tx *tx;
+	struct node_rx_pdu *ntf;
+
+	/* Tighter Central limits: max factor 5, min continuation number 2 */
+	ull_cp_set_default_subrate(1, 5, 20, 2, 1000);
+
+	struct pdu_data_llctrl_subrate_req remote_req = {
+		.subrate_factor_min = 2,
+		.subrate_factor_max = 8,
+		.max_latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ind = {
+		.subrate_factor = 5, /* MIN(acc max 5, req max 8) */
+		.subrate_base_event = 0, /* set from event_counter() below */
+		.latency = 5,
+		.continuation_number = 2, /* MAX(acc 2, req 1) */
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ntf = {
+		.subrate_factor = 5,
+		.subrate_base_event = 0,
+		.latency = 5,
+		.continuation_number = 2,
+		.timeout = 500,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Rx the peer Peripheral's LL_SUBRATE_REQ */
+	event_prepare(&conn);
+	lt_tx(LL_SUBRATE_REQ, &conn, &remote_req);
+	event_done(&conn);
+
+	/* The Central answers with the clamped/negotiated LL_SUBRATE_IND */
+	event_prepare(&conn);
+	exp_ind.subrate_base_event = event_counter(&conn);
+	exp_ntf.subrate_base_event = exp_ind.subrate_base_event;
+	lt_rx(LL_SUBRATE_IND, &conn, &tx, &exp_ind);
+	lt_rx_q_is_empty(&conn);
+
+	/* Ack the LL_SUBRATE_IND */
+	event_tx_ack(&conn, tx);
+	event_done(&conn);
+
+	/* The host is notified of the applied (clamped) subrate parameters */
+	ut_rx_pdu(LL_SUBRATE_IND, &ntf, &exp_ntf);
+	ut_rx_q_is_empty();
+
+	/* Verify the clamped parameters were applied */
+	zassert_equal(conn.lll.subrate.factor, 5, "subrate factor %u", conn.lll.subrate.factor);
+	zassert_equal(conn.lll.subrate.continuation_number, 2, "subrate cont %u",
+		      conn.lll.subrate.continuation_number);
+	zassert_equal(conn.lll.latency, 5, "latency %u", conn.lll.latency);
+	zassert_equal(conn.supervision_timeout, 500, "supervision timeout %u",
+		      conn.supervision_timeout);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+	release_ntf(ntf);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+/*
+ * Locally-initiated (Central-originated) Connection Subrate Update.
+ *
+ * A Central transmits LL_SUBRATE_IND directly (no LL_SUBRATE_REQ) and applies
+ * the parameters on the Link Layer acknowledgment (Core 5.4, Vol 6, Part B,
+ * 5.1.19).
+ *
+ * +-----+                    +-------+                    +-----+
+ * | UT  |                    | LL_C  |                    | LT  |
+ * +-----+                    +-------+                    +-----+
+ *    | Subrate Request           |                           |
+ *    |-------------------------->|                           |
+ *    |                           | LL_SUBRATE_IND            |
+ *    |                           |-------------------------->|
+ *    |                           |              (LL ack)      |
+ *    | Subrate Change            |<--------------------------|
+ *    |  (applied on ack)         |                           |
+ *    |<--------------------------|                           |
+ *    |                           |                           |
+ */
+ZTEST(subrate_central_loc, test_subrate_central_loc)
+{
+	uint8_t err;
+	struct node_tx *tx;
+	struct node_rx_pdu *ntf;
+
+	struct pdu_data_llctrl_subrate_ind exp_ind = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0, /* set from event_counter() below */
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ntf = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0,
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Initiate a Connection Subrate Update Procedure */
+	err = ull_cp_subrate(&conn, 2, 8, 5, 1, 500);
+	zassert_equal(err, BT_HCI_ERR_SUCCESS);
+
+	/* The Central transmits LL_SUBRATE_IND directly - there must be no
+	 * LL_SUBRATE_REQ on the wire.
+	 */
+	event_prepare(&conn);
+	exp_ind.subrate_base_event = event_counter(&conn);
+	exp_ntf.subrate_base_event = exp_ind.subrate_base_event;
+	lt_rx(LL_SUBRATE_IND, &conn, &tx, &exp_ind);
+	lt_rx_q_is_empty(&conn);
+
+	/* Ack the LL_SUBRATE_IND */
+	event_tx_ack(&conn, tx);
+	event_done(&conn);
+
+	/* The host is notified of the applied subrate parameters */
+	ut_rx_pdu(LL_SUBRATE_IND, &ntf, &exp_ntf);
+	ut_rx_q_is_empty();
+
+	/* Verify the subrate parameters were applied on ack */
+	zassert_equal(conn.lll.subrate.factor, 8, "subrate factor %u", conn.lll.subrate.factor);
+	zassert_equal(conn.lll.subrate.base_event, exp_ind.subrate_base_event,
+		      "subrate base_event %u", conn.lll.subrate.base_event);
+	zassert_equal(conn.lll.subrate.continuation_number, 1, "subrate cont %u",
+		      conn.lll.subrate.continuation_number);
+	zassert_equal(conn.lll.latency, 5, "latency %u", conn.lll.latency);
+	zassert_equal(conn.supervision_timeout, 500, "supervision timeout %u",
+		      conn.supervision_timeout);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+	release_ntf(ntf);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+/*
+ * Locally-initiated (Central-originated) Connection Subrate Update - the
+ * negotiated parameters are applied only on the Link Layer acknowledgment of
+ * the LL_SUBRATE_IND, not when it is queued.
+ */
+ZTEST(subrate_central_loc, test_subrate_central_loc_apply_on_ack)
+{
+	uint8_t err;
+	struct node_tx *tx;
+	struct node_rx_pdu *ntf;
+
+	struct pdu_data_llctrl_subrate_ind exp_ind = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0, /* set from event_counter() below */
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	struct pdu_data_llctrl_subrate_ind exp_ntf = {
+		.subrate_factor = 8,
+		.subrate_base_event = 0,
+		.latency = 5,
+		.continuation_number = 1,
+		.timeout = 500,
+	};
+
+	test_set_role(&conn, BT_HCI_ROLE_CENTRAL);
+
+	/* Connect */
+	ull_cp_state_set(&conn, ULL_CP_CONNECTED);
+
+	/* Initiate a Connection Subrate Update Procedure */
+	err = ull_cp_subrate(&conn, 2, 8, 5, 1, 500);
+	zassert_equal(err, BT_HCI_ERR_SUCCESS);
+
+	/* The Central queues LL_SUBRATE_IND */
+	event_prepare(&conn);
+	exp_ind.subrate_base_event = event_counter(&conn);
+	exp_ntf.subrate_base_event = exp_ind.subrate_base_event;
+	lt_rx(LL_SUBRATE_IND, &conn, &tx, &exp_ind);
+	lt_rx_q_is_empty(&conn);
+
+	/* Nothing applied yet: the indication is only queued, not acknowledged */
+	zassert_equal(conn.lll.subrate.factor, 0, "subrate factor applied before ack %u",
+		      conn.lll.subrate.factor);
+
+	/* Ack the LL_SUBRATE_IND - parameters apply now */
+	event_tx_ack(&conn, tx);
+	event_done(&conn);
+
+	/* The host is notified of the applied subrate parameters */
+	ut_rx_pdu(LL_SUBRATE_IND, &ntf, &exp_ntf);
+	ut_rx_q_is_empty();
+
+	/* The negotiated parameters are now applied */
+	zassert_equal(conn.lll.subrate.factor, 8, "subrate factor not applied on ack %u",
+		      conn.lll.subrate.factor);
+
+	/* Release Tx */
+	ull_cp_release_tx(&conn, tx);
+	release_ntf(ntf);
+
+	/* Check context buffers */
+	zassert_equal(llcp_ctx_buffers_free(), test_ctx_buffers_cnt(),
+		      "Free CTX buffers %d", llcp_ctx_buffers_free());
+}
+
+ZTEST_SUITE(subrate_central_rem, NULL, NULL, subrate_central_setup, NULL, NULL);
+ZTEST_SUITE(subrate_central_loc, NULL, NULL, subrate_central_setup, NULL, NULL);

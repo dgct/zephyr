@@ -371,6 +371,11 @@ void llcp_rr_tx_ack(struct ll_conn *conn, struct proc_ctx *ctx, struct node_tx *
 		llcp_rp_comm_tx_ack(conn, ctx, tx);
 		break;
 #endif /* CONFIG_BT_CTLR_DF_CONN_CTE_RSP */
+#if defined(CONFIG_BT_CTLR_SUBRATING) && defined(CONFIG_BT_CENTRAL)
+	case PROC_SUBRATE:
+		llcp_rp_sr_tx_ack(conn, ctx, tx);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING && CONFIG_BT_CENTRAL */
 	default:
 		/* Ignore tx_ack */
 		break;
@@ -911,11 +916,15 @@ static const struct proc_role new_proc_lut[] = {
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ] = { PROC_FRAME_SPACE, ACCEPT_ROLE_BOTH },
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP] = { PROC_FRAME_SPACE, ACCEPT_ROLE_BOTH },
 #if defined(CONFIG_BT_CTLR_SUBRATING)
-	/* A peripheral accepts an unsolicited LL_SUBRATE_IND from the central.
-	 * LL_SUBRATE_REQ is intentionally left unmapped (PROC_UNKNOWN) so a
-	 * peripheral that receives one replies with LL_UNKNOWN_RSP.
+	/* A peripheral accepts an unsolicited LL_SUBRATE_IND from the central
+	 * (Core 5.4, Vol 6, Part B, 5.1.19). A central accepts an
+	 * LL_SUBRATE_REQ from the peripheral and answers it with an
+	 * LL_SUBRATE_IND or an LL_REJECT_EXT_IND (5.1.20).
 	 */
 	[PDU_DATA_LLCTRL_TYPE_SUBRATE_IND] = { PROC_SUBRATE, ACCEPT_ROLE_PERIPHERAL },
+#if defined(CONFIG_BT_CENTRAL)
+	[PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ] = { PROC_SUBRATE, ACCEPT_ROLE_CENTRAL },
+#endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_PHY)
 	[PDU_DATA_LLCTRL_TYPE_PHY_REQ] = { PROC_PHY_UPDATE, ACCEPT_ROLE_BOTH },

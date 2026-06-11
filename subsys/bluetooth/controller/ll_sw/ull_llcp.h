@@ -139,6 +139,16 @@ uint8_t ull_cp_conn_update(struct ll_conn *conn, uint16_t interval_min, uint16_t
  */
 uint8_t ull_cp_subrate(struct ll_conn *conn, uint16_t subrate_min, uint16_t subrate_max,
 		       uint16_t max_latency, uint16_t continuation_number, uint16_t timeout);
+
+#if defined(CONFIG_BT_CENTRAL)
+/**
+ * @brief Set the Central's connection-independent acceptable Connection Subrate
+ *        parameters used when answering a peer Peripheral's LL_SUBRATE_REQ.
+ */
+uint8_t ull_cp_set_default_subrate(uint16_t subrate_min, uint16_t subrate_max,
+				   uint16_t max_latency, uint16_t continuation_number,
+				   uint16_t timeout);
+#endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
 
 /**

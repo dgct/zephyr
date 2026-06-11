@@ -1162,6 +1162,53 @@ config BT_CTLR_SUBRATING
 	  Enable support for Bluetooth v5.3 LE Connection Subrating
 	  in the Controller.
 
+if BT_CTLR_SUBRATING && BT_CENTRAL
+
+config BT_CTLR_SUBRATING_DEFAULT_FACTOR_MIN
+	int "Acceptable minimum subrate factor"
+	range 1 500
+	default 1
+	help
+	  Lower bound of the subrate factor the Controller will accept when, as
+	  a Central, it answers a peer Peripheral's LL_SUBRATE_REQ
+	  (Core 5.4, Vol 6, Part B, 5.1.20).
+
+config BT_CTLR_SUBRATING_DEFAULT_FACTOR_MAX
+	int "Acceptable maximum subrate factor"
+	range 1 500
+	default 500
+	help
+	  Upper bound of the subrate factor the Controller will accept and the
+	  largest factor it will grant when, as a Central, it answers a peer
+	  Peripheral's LL_SUBRATE_REQ.
+
+config BT_CTLR_SUBRATING_DEFAULT_MAX_LATENCY
+	int "Acceptable maximum subrated peripheral latency"
+	range 0 499
+	default 499
+	help
+	  Largest subrated Peripheral latency the Controller will accept when,
+	  as a Central, it answers a peer Peripheral's LL_SUBRATE_REQ.
+
+config BT_CTLR_SUBRATING_DEFAULT_CONT_NUMBER
+	int "Acceptable minimum continuation number"
+	range 0 499
+	default 0
+	help
+	  Lower bound of the continuation number the Controller will grant when,
+	  as a Central, it answers a peer Peripheral's LL_SUBRATE_REQ.
+
+config BT_CTLR_SUBRATING_DEFAULT_TIMEOUT
+	int "Acceptable maximum supervision timeout (10 ms units)"
+	range 10 3200
+	default 3200
+	help
+	  Largest supervision timeout (in 10 ms units) the Controller will
+	  accept when, as a Central, it answers a peer Peripheral's
+	  LL_SUBRATE_REQ.
+
+endif # BT_CTLR_SUBRATING && BT_CENTRAL
+
 config BT_CTLR_FRAME_SPACE_UPDATE
 	bool "Frame Space Update"
 	depends on BT_CTLR_FRAME_SPACE_UPDATE_SUPPORT

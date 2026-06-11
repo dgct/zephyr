@@ -1089,6 +1089,38 @@ uint8_t ull_cp_conn_update(struct ll_conn *conn, uint16_t interval_min, uint16_t
 }
 
 #if defined(CONFIG_BT_CTLR_SUBRATING)
+#if defined(CONFIG_BT_CENTRAL)
+/* Connection-independent acceptable Connection Subrate parameters used when a
+ * peer Peripheral requests a subrate change (Core 5.4, Vol 6, Part B, 5.1.20).
+ * Seeded from Kconfig and overridable through ull_cp_set_default_subrate().
+ */
+static struct llcp_subrate_defaults default_subrate = {
+	.factor_min = CONFIG_BT_CTLR_SUBRATING_DEFAULT_FACTOR_MIN,
+	.factor_max = CONFIG_BT_CTLR_SUBRATING_DEFAULT_FACTOR_MAX,
+	.max_latency = CONFIG_BT_CTLR_SUBRATING_DEFAULT_MAX_LATENCY,
+	.continuation_number = CONFIG_BT_CTLR_SUBRATING_DEFAULT_CONT_NUMBER,
+	.timeout = CONFIG_BT_CTLR_SUBRATING_DEFAULT_TIMEOUT,
+};
+
+const struct llcp_subrate_defaults *llcp_subrate_defaults_get(void)
+{
+	return &default_subrate;
+}
+
+uint8_t ull_cp_set_default_subrate(uint16_t subrate_min, uint16_t subrate_max,
+				   uint16_t max_latency, uint16_t continuation_number,
+				   uint16_t timeout)
+{
+	default_subrate.factor_min = subrate_min;
+	default_subrate.factor_max = subrate_max;
+	default_subrate.max_latency = max_latency;
+	default_subrate.continuation_number = continuation_number;
+	default_subrate.timeout = timeout;
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* CONFIG_BT_CENTRAL */
+
 uint8_t ull_cp_subrate(struct ll_conn *conn, uint16_t subrate_min, uint16_t subrate_max,
 		       uint16_t max_latency, uint16_t continuation_number, uint16_t timeout)
 {
