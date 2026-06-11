@@ -98,6 +98,7 @@ static bool proc_with_instant(struct proc_ctx *ctx)
 	case PROC_CIS_CREATE:
 	case PROC_SCA_UPDATE:
 	case PROC_PERIODIC_SYNC:
+	case PROC_SUBRATE:
 		return 0U;
 	case PROC_PHY_UPDATE:
 	case PROC_CONN_UPDATE:
@@ -300,6 +301,11 @@ void llcp_rr_rx(struct ll_conn *conn, struct proc_ctx *ctx, memq_link_t *link,
 	case PROC_FRAME_SPACE:
 		llcp_rp_comm_rx(conn, ctx, rx);
 		break;
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case PROC_SUBRATE:
+		llcp_rp_sr_rx(conn, ctx, rx);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ:
 		llcp_rp_comm_rx(conn, ctx, rx);
@@ -449,6 +455,11 @@ static void rr_act_run(struct ll_conn *conn)
 	case PROC_FRAME_SPACE:
 		llcp_rp_comm_run(conn, ctx, NULL);
 		break;
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case PROC_SUBRATE:
+		llcp_rp_sr_run(conn, ctx, NULL);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_RSP)
 	case PROC_CTE_REQ:
 		llcp_rp_comm_run(conn, ctx, NULL);
@@ -899,6 +910,13 @@ static const struct proc_role new_proc_lut[] = {
 	[PDU_DATA_LLCTRL_TYPE_LENGTH_RSP] = { PROC_UNKNOWN, ACCEPT_ROLE_NONE },
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ] = { PROC_FRAME_SPACE, ACCEPT_ROLE_BOTH },
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP] = { PROC_FRAME_SPACE, ACCEPT_ROLE_BOTH },
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	/* A peripheral accepts an unsolicited LL_SUBRATE_IND from the central.
+	 * LL_SUBRATE_REQ is intentionally left unmapped (PROC_UNKNOWN) so a
+	 * peripheral that receives one replies with LL_UNKNOWN_RSP.
+	 */
+	[PDU_DATA_LLCTRL_TYPE_SUBRATE_IND] = { PROC_SUBRATE, ACCEPT_ROLE_PERIPHERAL },
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_PHY)
 	[PDU_DATA_LLCTRL_TYPE_PHY_REQ] = { PROC_PHY_UPDATE, ACCEPT_ROLE_BOTH },
 #endif /* CONFIG_BT_CTLR_PHY */

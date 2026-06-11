@@ -900,6 +900,55 @@ void llcp_pdu_decode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 	}
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+/*
+ * Connection Subrate Update Procedure Helpers
+ */
+void llcp_pdu_encode_subrate_req(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_req *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(subrate_req);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_REQ;
+
+	p = &pdu->llctrl.subrate_req;
+	p->subrate_factor_min = sys_cpu_to_le16(ctx->data.subrate.subrate_factor_min);
+	p->subrate_factor_max = sys_cpu_to_le16(ctx->data.subrate.subrate_factor_max);
+	p->max_latency = sys_cpu_to_le16(ctx->data.subrate.max_latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.subrate.continuation_number);
+	p->timeout = sys_cpu_to_le16(ctx->data.subrate.timeout);
+}
+
+void llcp_pdu_decode_subrate_ind(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_ind *p;
+
+	p = &pdu->llctrl.subrate_ind;
+	ctx->data.subrate.subrate_factor = sys_le16_to_cpu(p->subrate_factor);
+	ctx->data.subrate.subrate_base_event = sys_le16_to_cpu(p->subrate_base_event);
+	ctx->data.subrate.latency = sys_le16_to_cpu(p->latency);
+	ctx->data.subrate.continuation_number = sys_le16_to_cpu(p->continuation_number);
+	ctx->data.subrate.timeout = sys_le16_to_cpu(p->timeout);
+}
+
+void llcp_ntf_encode_subrate_change(struct proc_ctx *ctx, struct pdu_data *pdu)
+{
+	struct pdu_data_llctrl_subrate_ind *p;
+
+	pdu->ll_id = PDU_DATA_LLID_CTRL;
+	pdu->len = PDU_DATA_LLCTRL_LEN(subrate_ind);
+	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_SUBRATE_IND;
+
+	p = &pdu->llctrl.subrate_ind;
+	p->subrate_factor = sys_cpu_to_le16(ctx->data.subrate.subrate_factor);
+	p->subrate_base_event = sys_cpu_to_le16(ctx->data.subrate.subrate_base_event);
+	p->latency = sys_cpu_to_le16(ctx->data.subrate.latency);
+	p->continuation_number = sys_cpu_to_le16(ctx->data.subrate.continuation_number);
+	p->timeout = sys_cpu_to_le16(ctx->data.subrate.timeout);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
 /*
  * Constant Tone Request Procedure Helper

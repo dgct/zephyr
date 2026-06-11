@@ -1088,6 +1088,34 @@ uint8_t ull_cp_conn_update(struct ll_conn *conn, uint16_t interval_min, uint16_t
 	return BT_HCI_ERR_SUCCESS;
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+uint8_t ull_cp_subrate(struct ll_conn *conn, uint16_t subrate_min, uint16_t subrate_max,
+		       uint16_t max_latency, uint16_t continuation_number, uint16_t timeout)
+{
+	struct proc_ctx *ctx;
+
+	if (!feature_subrating(conn)) {
+		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
+	}
+
+	ctx = llcp_create_local_procedure(PROC_SUBRATE);
+	if (!ctx) {
+		return BT_HCI_ERR_CMD_DISALLOWED;
+	}
+
+	/* Store arguments in corresponding procedure context */
+	ctx->data.subrate.subrate_factor_min = subrate_min;
+	ctx->data.subrate.subrate_factor_max = subrate_max;
+	ctx->data.subrate.max_latency = max_latency;
+	ctx->data.subrate.continuation_number = continuation_number;
+	ctx->data.subrate.timeout = timeout;
+
+	llcp_lr_enqueue(conn, ctx);
+
+	return BT_HCI_ERR_SUCCESS;
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_SYNC_TRANSFER_SENDER)
 uint8_t ull_cp_periodic_sync(struct ll_conn *conn, struct ll_sync_set *sync,
 			     struct ll_adv_sync_set *adv_sync, uint16_t service_data)
@@ -1852,6 +1880,13 @@ static bool pdu_validate_fsu_rsp(struct pdu_data *pdu)
 	return VALIDATE_PDU_LEN(pdu, fsu_rsp);
 }
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+static bool pdu_validate_subrate_ind(struct pdu_data *pdu)
+{
+	return VALIDATE_PDU_LEN(pdu, subrate_ind);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_CTLR_PHY)
 static bool pdu_validate_phy_req(struct pdu_data *pdu)
 {
@@ -1967,6 +2002,9 @@ static const struct pdu_validate pdu_validate[] = {
 	[PDU_DATA_LLCTRL_TYPE_LENGTH_RSP] = { pdu_validate_length_rsp },
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ] = { pdu_validate_fsu_req },
 	[PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP] = { pdu_validate_fsu_rsp },
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	[PDU_DATA_LLCTRL_TYPE_SUBRATE_IND] = { pdu_validate_subrate_ind },
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 #if defined(CONFIG_BT_CTLR_PHY)
 	[PDU_DATA_LLCTRL_TYPE_PHY_REQ] = { pdu_validate_phy_req },
 #endif /* CONFIG_BT_CTLR_PHY */
