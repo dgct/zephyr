@@ -9348,6 +9348,37 @@ static void le_conn_rate_change(struct pdu_data *pdu_data, uint16_t handle,
 }
 #endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+static void le_subrate_change(struct pdu_data *pdu_data, uint16_t handle,
+			      struct net_buf *buf)
+{
+	struct pdu_data_llctrl_subrate_ind *p;
+	struct bt_hci_evt_le_subrate_change *sep;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_SUBRATE_CHANGE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_SUBRATE_CHANGE, sizeof(*sep));
+
+	/* An LL_SUBRATE_IND is only delivered here on the success path; error
+	 * outcomes are reported via LL_UNKNOWN_RSP / LL_REJECT_EXT_IND. The PDU
+	 * fields are already little-endian, so copy them straight into the (also
+	 * little-endian) event (only the native handle is swapped). The subrate
+	 * base event is an on-air scheduling detail and is not part of the HCI
+	 * event (Core 6.2, Vol 4, Part E, 7.7.65.35).
+	 */
+	p = &pdu_data->llctrl.subrate_ind;
+	sep->status = 0x00;
+	sep->handle = sys_cpu_to_le16(handle);
+	sep->subrate_factor = p->subrate_factor;
+	sep->peripheral_latency = p->latency;
+	sep->continuation_number = p->continuation_number;
+	sep->supervision_timeout = p->timeout;
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING */
+
 #if defined(CONFIG_BT_REMOTE_VERSION)
 static void remote_version_info_encode(struct pdu_data *pdu_data,
 				       uint16_t handle, struct net_buf *buf)
@@ -9441,6 +9472,12 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 		le_conn_rate_change(pdu_data, handle, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING)
+	case PDU_DATA_LLCTRL_TYPE_SUBRATE_IND:
+		le_subrate_change(pdu_data, handle, buf);
+		break;
+#endif /* CONFIG_BT_CTLR_SUBRATING */
 
 	default:
 		LL_ASSERT_DBG(0);
