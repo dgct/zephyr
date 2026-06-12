@@ -318,6 +318,7 @@ static uint8_t pu_update_eff_times(struct ll_conn *conn, struct proc_ctx *ctx)
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
 static uint8_t pu_phy_to_index(uint8_t phy)
 {
 	switch (phy) {
@@ -372,6 +373,7 @@ static uint8_t pu_update_eff_tifs(struct ll_conn *conn, struct proc_ctx *ctx)
 
 	return 0;
 }
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 static inline void pu_set_preferred_phys(struct ll_conn *conn, struct proc_ctx *ctx)
 {
@@ -833,9 +835,11 @@ static void lp_pu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint
 			ctx->data.pu.ntf_dle = pu_update_eff_times(conn, ctx);
 		}
 #endif
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
 		if (phy_changed) {
 			pu_update_eff_tifs(conn, ctx);
 		}
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 		llcp_rr_set_incompat(conn, INCOMPAT_NO_COLLISION);
 		ctx->data.pu.error = BT_HCI_ERR_SUCCESS;
@@ -1266,9 +1270,11 @@ static void rp_pu_check_instant(struct ll_conn *conn, struct proc_ctx *ctx, uint
 			ctx->data.pu.ntf_dle = pu_update_eff_times(conn, ctx);
 		}
 #endif
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
 		if (phy_changed) {
 			pu_update_eff_tifs(conn, ctx);
 		}
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 		/* if PHY settings changed we should generate NTF */
 		ctx->data.pu.ntf_pu = phy_changed;
