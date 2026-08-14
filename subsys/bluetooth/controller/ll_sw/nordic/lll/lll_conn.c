@@ -198,7 +198,7 @@ int lll_conn_central_is_abort_cb(void *next, void *curr,
 		/* Do not be aborted by same event if a single central's Rx has not completed.
 		 * Cases where single trx duration can be greater than connection interval.
 		 */
-		return -EBUSY;
+		return -ECANCELED;
 	}
 
 	LL_ASSERT_DBG(trx_busy_iteration < CENTRAL_TRX_BUSY_ITERATION_MAX);
@@ -232,7 +232,7 @@ int lll_conn_peripheral_is_abort_cb(void *next, void *curr,
 		/* Do not be aborted by same event if a single peripheral's Tx has not completed.
 		 * Cases where single trx duration can be greater than connection interval.
 		 */
-		return -EBUSY;
+		return -ECANCELED;
 	}
 
 	LL_ASSERT_DBG(trx_busy_iteration < PERIPHERAL_TRX_BUSY_ITERATION_MAX);
