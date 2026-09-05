@@ -8,6 +8,12 @@ int lll_prepare_done(void *param);
 int lll_done(void *param);
 bool lll_is_done(void *param, bool *is_resume);
 int lll_is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb);
+#if defined(CONFIG_BT_CTLR_USER_EXT)
+/* True when the prepare with this LLL context belongs to a user event that
+ * must never preempt a Bluetooth role; the preemptor is cancelled instead.
+ */
+bool lll_user_prepare_yields(void *param);
+#endif /* CONFIG_BT_CTLR_USER_EXT */
 void lll_abort_cb(struct lll_prepare_param *prepare_param, void *param);
 
 uint32_t lll_event_offset_get(struct ull_hdr *ull);

@@ -624,6 +624,18 @@ bool lll_is_done(void *param, bool *is_resume)
 	return !event.curr.abort_cb;
 }
 
+#if defined(CONFIG_BT_CTLR_USER_EXT)
+/* Default: user events compete like any other event. A user extension
+ * overrides this to keep its events from ever preempting a Bluetooth role.
+ */
+__weak bool lll_user_prepare_yields(void *param)
+{
+	ARG_UNUSED(param);
+
+	return false;
+}
+#endif /* CONFIG_BT_CTLR_USER_EXT */
+
 int lll_is_abort_cb(void *next, void *curr, lll_prepare_cb_t *resume_cb)
 {
 	return -ECANCELED;
@@ -1406,6 +1418,18 @@ preempt_find_preemptor:
 		 */
 		event.curr.has_margin = 1U;
 	}
+
+#if defined(CONFIG_BT_CTLR_USER_EXT)
+	/* A user (proprietary) event that must never displace a Bluetooth role
+	 * is cancelled instead of being allowed to abort the current event.
+	 */
+	if (lll_user_prepare_yields(ready->prepare_param.param)) {
+		ready->is_aborted = 1;
+		ready->abort_cb(&ready->prepare_param, ready->prepare_param.param);
+
+		return;
+	}
+#endif /* CONFIG_BT_CTLR_USER_EXT */
 
 	/* Check if current event want to continue */
 	err = event.curr.is_abort_cb(ready->prepare_param.param, event.curr.param, &resume_cb);
