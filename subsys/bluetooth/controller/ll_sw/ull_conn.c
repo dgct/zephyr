@@ -388,7 +388,14 @@ uint8_t ll_set_default_rate_params(uint16_t conn_interval_min, uint16_t conn_int
 uint8_t ll_fsu(uint16_t handle, uint16_t fsu_min, uint16_t fsu_max, uint8_t phys,
 	       uint16_t spacing_types)
 {
-	return bt_ull_cp_fsu(handle, fsu_min, fsu_max, phys, spacing_types);
+	struct ll_conn *conn;
+
+	conn = ll_connected_get(handle);
+	if (!conn) {
+		return BT_HCI_ERR_UNKNOWN_CONN_ID;
+	}
+
+	return ull_cp_fsu(conn, fsu_min, fsu_max, phys, spacing_types);
 }
 #endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
