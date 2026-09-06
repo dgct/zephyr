@@ -846,7 +846,11 @@ void llcp_pdu_encode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_encode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_decode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu);
 void llcp_pdu_decode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu);
-void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu);
+/* Who started the Frame Space Update the notification reports; the values
+ * match the HCI LE Frame Space Update Complete event's Initiator field. */
+#define LLCP_FSU_INITIATOR_LOCAL_HOST 0U
+#define LLCP_FSU_INITIATOR_PEER       2U
+void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu, uint8_t initiator);
 
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 /*

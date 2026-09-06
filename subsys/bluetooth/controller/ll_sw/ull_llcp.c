@@ -965,7 +965,7 @@ uint8_t ull_cp_fsu(struct ll_conn *conn, uint16_t fsu_min, uint16_t fsu_max,
 	struct proc_ctx *ctx;
 
 	if (!feature_fsu(conn)) {
-		return BT_HCI_ERR_SUCCESS;
+		return BT_HCI_ERR_UNSUPP_REMOTE_FEATURE;
 	}
 
 	ctx = llcp_create_local_procedure(PROC_FRAME_SPACE);

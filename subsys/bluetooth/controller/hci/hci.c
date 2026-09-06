@@ -2663,6 +2663,40 @@ static void le_conn_param_req_neg_reply(struct net_buf *buf,
 }
 #endif /* CONFIG_BT_CTLR_CONN_PARAM_REQ */
 
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+static void le_frame_space_update(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_frame_space_update *cmd = (void *)buf->data;
+	uint16_t handle;
+	uint8_t status;
+
+	handle = sys_le16_to_cpu(cmd->handle);
+	status = ll_fsu(handle, sys_le16_to_cpu(cmd->frame_space_min),
+			sys_le16_to_cpu(cmd->frame_space_max), cmd->phys,
+			sys_le16_to_cpu(cmd->spacing_types));
+
+	*evt = cmd_status(status);
+}
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING) && defined(CONFIG_BT_CENTRAL)
+static void le_set_default_subrate(struct net_buf *buf, struct net_buf **evt)
+{
+	struct bt_hci_cp_le_set_default_subrate *cmd = (void *)buf->data;
+	struct bt_hci_evt_cc_status *ccst;
+	uint8_t status;
+
+	status = ll_set_default_subrate(sys_le16_to_cpu(cmd->subrate_min),
+					sys_le16_to_cpu(cmd->subrate_max),
+					sys_le16_to_cpu(cmd->max_latency),
+					sys_le16_to_cpu(cmd->continuation_number),
+					sys_le16_to_cpu(cmd->supervision_timeout));
+
+	ccst = hci_cmd_complete(evt, sizeof(*ccst));
+	ccst->status = status;
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING && CONFIG_BT_CENTRAL */
+
 #if defined(CONFIG_BT_CTLR_SUBRATING)
 static void le_subrate_request(struct net_buf *buf, struct net_buf **evt)
 {
@@ -4900,7 +4934,19 @@ static int controller_cmd_handle(uint16_t  ocf, struct net_buf *cmd,
 	case BT_OCF(BT_HCI_OP_LE_SUBRATE_REQUEST):
 		le_subrate_request(cmd, evt);
 		break;
+
+#if defined(CONFIG_BT_CENTRAL)
+	case BT_OCF(BT_HCI_OP_LE_SET_DEFAULT_SUBRATE):
+		le_set_default_subrate(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	case BT_OCF(BT_HCI_OP_LE_FRAME_SPACE_UPDATE):
+		le_frame_space_update(cmd, evt);
+		break;
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 #if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
 	case BT_OCF(BT_HCI_OP_LE_CONNECTION_RATE_REQUEST):
@@ -9318,6 +9364,42 @@ static void le_data_len_change(struct pdu_data *pdu_data, uint16_t handle,
 }
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+/* The LLCP notification carries the effective frame space: RSP layout when
+ * this side initiated the update, REQ layout (min = max) when the peer did.
+ */
+static void le_frame_space_update_complete(struct pdu_data *pdu_data, uint16_t handle,
+					   struct net_buf *buf)
+{
+	struct bt_hci_evt_le_frame_space_update_complete *sep;
+
+	if (!(event_mask & BT_EVT_MASK_LE_META_EVENT) ||
+	    !(le_event_mask & BT_EVT_MASK_LE_FRAME_SPACE_UPDATE_COMPLETE)) {
+		return;
+	}
+
+	sep = meta_evt(buf, BT_HCI_EVT_LE_FRAME_SPACE_UPDATE_COMPLETE, sizeof(*sep));
+
+	sep->status = BT_HCI_ERR_SUCCESS;
+	sep->handle = sys_cpu_to_le16(handle);
+	if (pdu_data->llctrl.opcode == PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ) {
+		struct pdu_data_llctrl_fsu_req *p = &pdu_data->llctrl.fsu_req;
+
+		sep->initiator = BT_HCI_LE_FRAME_SPACE_UPDATE_INITIATOR_PEER;
+		sep->frame_space = p->fsu_min;
+		sep->phys = p->phys;
+		sep->spacing_types = p->spacing_type;
+	} else {
+		struct pdu_data_llctrl_fsu_rsp *p = &pdu_data->llctrl.fsu_rsp;
+
+		sep->initiator = BT_HCI_LE_FRAME_SPACE_UPDATE_INITIATOR_LOCAL_HOST;
+		sep->frame_space = p->fsu;
+		sep->phys = p->phys;
+		sep->spacing_types = p->spacing_type;
+	}
+}
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
+
 #if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
 static void le_conn_rate_change(struct pdu_data *pdu_data, uint16_t handle,
 				struct net_buf *buf)
@@ -9478,6 +9560,13 @@ static void encode_data_ctrl(struct node_rx_pdu *node_rx,
 		le_subrate_change(pdu_data, handle, buf);
 		break;
 #endif /* CONFIG_BT_CTLR_SUBRATING */
+
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+	case PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ:
+	case PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP:
+		le_frame_space_update_complete(pdu_data, handle, buf);
+		break;
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
 
 	default:
 		LL_ASSERT_DBG(0);

@@ -307,7 +307,7 @@ static void lp_comm_ntf_length_change(struct ll_conn *conn, struct proc_ctx *ctx
 static void lp_comm_ntf_fsu_change(struct ll_conn *conn, struct proc_ctx *ctx,
 					   struct pdu_data *pdu)
 {
-	llcp_ntf_encode_fsu_change(conn, pdu);
+	llcp_ntf_encode_fsu_change(conn, pdu, LLCP_FSU_INITIATOR_LOCAL_HOST);
 }
 
 #if defined(CONFIG_BT_CTLR_DF_CONN_CTE_REQ)
@@ -1295,7 +1295,7 @@ static void rp_comm_ntf(struct ll_conn *conn, struct proc_ctx *ctx, uint8_t gene
 			break;
 #endif /* CONFIG_BT_CTLR_DATA_LENGTH */
 		case PROC_FRAME_SPACE:
-			llcp_ntf_encode_fsu_change(conn, pdu);
+			llcp_ntf_encode_fsu_change(conn, pdu, LLCP_FSU_INITIATOR_PEER);
 			break;
 		default:
 			LL_ASSERT_DBG(0);

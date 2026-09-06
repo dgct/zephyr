@@ -384,6 +384,23 @@ uint8_t ll_set_default_rate_params(uint16_t conn_interval_min, uint16_t conn_int
 #endif /* CONFIG_BT_CENTRAL */
 #endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
 
+#if defined(CONFIG_BT_CTLR_FRAME_SPACE_UPDATE)
+uint8_t ll_fsu(uint16_t handle, uint16_t fsu_min, uint16_t fsu_max, uint8_t phys,
+	       uint16_t spacing_types)
+{
+	return bt_ull_cp_fsu(handle, fsu_min, fsu_max, phys, spacing_types);
+}
+#endif /* CONFIG_BT_CTLR_FRAME_SPACE_UPDATE */
+
+#if defined(CONFIG_BT_CTLR_SUBRATING) && defined(CONFIG_BT_CENTRAL)
+uint8_t ll_set_default_subrate(uint16_t subrate_min, uint16_t subrate_max, uint16_t max_latency,
+			       uint16_t continuation_number, uint16_t supervision_timeout)
+{
+	return ull_cp_set_default_subrate(subrate_min, subrate_max, max_latency,
+					  continuation_number, supervision_timeout);
+}
+#endif /* CONFIG_BT_CTLR_SUBRATING && CONFIG_BT_CENTRAL */
+
 uint8_t ll_chm_get(uint16_t handle, uint8_t *chm)
 {
 	struct ll_conn *conn;

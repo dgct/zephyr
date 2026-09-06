@@ -838,18 +838,36 @@ void llcp_pdu_encode_fsu_rsp(struct ll_conn *conn, struct pdu_data *pdu)
 	p->spacing_type = sys_cpu_to_le16(conn->lll.fsu.eff.spacing_type);
 }
 
-void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu)
+/* The notification never goes on air: the opcode tells the HCI layer who
+ * initiated the update. A locally initiated update is reported with the RSP
+ * layout, a peer-initiated one with the REQ layout (min = max = effective).
+ */
+void llcp_ntf_encode_fsu_change(struct ll_conn *conn, struct pdu_data *pdu, uint8_t initiator)
 {
-	struct pdu_data_llctrl_fsu_rsp *p;
-
 	pdu->ll_id = PDU_DATA_LLID_CTRL;
-	pdu->len = sizeof(struct pdu_data_llctrl_fsu_rsp) + 1U;
-	pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP;
-	p = &pdu->llctrl.fsu_rsp;
 
-	p->fsu = sys_cpu_to_le16(conn->lll.fsu.eff.fsu_min);
-	p->phys = conn->lll.fsu.eff.phys;
-	p->spacing_type = sys_cpu_to_le16(conn->lll.fsu.eff.spacing_type);
+	if (initiator == LLCP_FSU_INITIATOR_PEER) {
+		struct pdu_data_llctrl_fsu_req *p;
+
+		pdu->len = sizeof(struct pdu_data_llctrl_fsu_req) + 1U;
+		pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_REQ;
+		p = &pdu->llctrl.fsu_req;
+
+		p->fsu_min = sys_cpu_to_le16(conn->lll.fsu.eff.fsu_min);
+		p->fsu_max = sys_cpu_to_le16(conn->lll.fsu.eff.fsu_min);
+		p->phys = conn->lll.fsu.eff.phys;
+		p->spacing_type = sys_cpu_to_le16(conn->lll.fsu.eff.spacing_type);
+	} else {
+		struct pdu_data_llctrl_fsu_rsp *p;
+
+		pdu->len = sizeof(struct pdu_data_llctrl_fsu_rsp) + 1U;
+		pdu->llctrl.opcode = PDU_DATA_LLCTRL_TYPE_FRAME_SPACE_RSP;
+		p = &pdu->llctrl.fsu_rsp;
+
+		p->fsu = sys_cpu_to_le16(conn->lll.fsu.eff.fsu_min);
+		p->phys = conn->lll.fsu.eff.phys;
+		p->spacing_type = sys_cpu_to_le16(conn->lll.fsu.eff.spacing_type);
+	}
 }
 
 void llcp_pdu_decode_fsu_req(struct ll_conn *conn, struct pdu_data *pdu)
