@@ -124,13 +124,29 @@ enum {
  * Connection Subrate Update Procedure Helpers
  */
 
+/* lll->interval is in 1.25 ms units, or in 125 us units once Shorter
+ * Connection Intervals is active: the spec relationship
+ * timeout > 2 * factor * (latency + 1) * interval is evaluated in
+ * microseconds so a subrated SCI link is not held to a check ten times too
+ * strict (a failed check terminates the connection).
+ */
+static uint32_t sr_interval_us(const struct ll_conn *conn)
+{
+#if defined(CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS)
+	if (conn->lll.sci_active) {
+		return (uint32_t)conn->lll.interval * CONN_SCI_INT_UNIT_US;
+	}
+#endif /* CONFIG_BT_CTLR_SHORTER_CONNECTION_INTERVALS */
+	return (uint32_t)conn->lll.interval * CONN_INT_UNIT_US;
+}
+
 static bool sr_check_ind_parameters(struct ll_conn *conn, struct proc_ctx *ctx)
 {
 	const uint16_t subrate_factor = ctx->data.subrate.subrate_factor;
 	const uint16_t continuation_number = ctx->data.subrate.continuation_number;
 	const uint16_t latency = ctx->data.subrate.latency;
 	const uint16_t timeout = ctx->data.subrate.timeout;
-	const uint16_t interval = conn->lll.interval;
+	const uint32_t interval_us = sr_interval_us(conn);
 
 	/* Valid LL_SUBRATE_IND parameters (Core 5.4, Vol 6, Part B, 5.1.19.2):
 	 *  - 1 <= subrate factor <= 500
@@ -147,8 +163,8 @@ static bool sr_check_ind_parameters(struct ll_conn *conn, struct proc_ctx *ctx)
 	       (latency <= SUBRATE_LATENCY_MAX) &&
 	       (timeout >= SUBRATE_TIMEOUT_100MS) &&
 	       (timeout <= SUBRATE_TIMEOUT_32SEC) &&
-	       (((uint32_t)timeout * 4U) >
-		((uint32_t)subrate_factor * ((uint32_t)latency + 1U) * interval));
+	       (((uint64_t)timeout * 10000U) >
+		(2U * (uint64_t)subrate_factor * ((uint64_t)latency + 1U) * interval_us));
 }
 
 static void sr_apply(struct ll_conn *conn, struct proc_ctx *ctx)
@@ -256,7 +272,7 @@ static bool sr_select_ind_parameters(struct ll_conn *conn, struct proc_ctx *ctx)
 	const uint16_t max_latency_req = ctx->data.subrate.max_latency;
 	const uint16_t cont_req = ctx->data.subrate.continuation_number;
 	const uint16_t timeout_req = ctx->data.subrate.timeout;
-	const uint16_t interval = conn->lll.interval;
+	const uint32_t interval_us = sr_interval_us(conn);
 	uint16_t factor;
 	uint16_t cont;
 
@@ -270,8 +286,8 @@ static bool sr_select_ind_parameters(struct ll_conn *conn, struct proc_ctx *ctx)
 	    (timeout_req > acc->timeout) ||
 	    (factor_max_req < acc->factor_min) ||
 	    (factor_min_req > acc->factor_max) ||
-	    (((uint32_t)factor_min_req * ((uint32_t)max_latency_req + 1U) * interval) >=
-	     ((uint32_t)timeout_req * 4U))) {
+	    ((2U * (uint64_t)factor_min_req * ((uint64_t)max_latency_req + 1U) * interval_us) >=
+	     ((uint64_t)timeout_req * 10000U))) {
 		return false;
 	}
 
